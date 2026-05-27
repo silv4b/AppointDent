@@ -15,7 +15,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         className="flex flex-col transition-all duration-300"
         style={{ marginLeft: collapsed ? 64 : 260 }}
       >
-        <DashboardHeader />
+        <DashboardHeader collapsed={collapsed} onToggleCollapse={() => setCollapsed((p) => !p)} />
         <main className="flex-1 p-4 sm:p-6">
           <div className="space-y-6 animate-fade-in">
             {children}

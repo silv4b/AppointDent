@@ -22,8 +22,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
   createAppointment,
   deleteAppointment,
+  searchAppointmentsForReturn,
   updateAppointment,
 } from "@/lib/actions/appointments"
 import { quickCreatePatient } from "@/lib/actions/patients"
@@ -53,6 +62,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  RotateCcw,
   Trash2,
   UserPlus,
   List,
@@ -213,6 +223,170 @@ function QuickPatientDialog({
   )
 }
 
+// ============================================================
+// Return Appointment Dialog
+// ============================================================
+function ReturnDialog({
+  open,
+  onOpenChange,
+  patients,
+  dentists,
+  onSelect,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  patients: { id: string; name: string }[]
+  dentists: { id: string; name: string }[]
+  onSelect: (appointment: Appointment) => void
+}) {
+  const today = new Date()
+  const [month, setMonth] = useState(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`)
+  const [patientId, setPatientId] = useState("")
+  const [dentistId, setDentistId] = useState("")
+  const [results, setResults] = useState<Appointment[]>([])
+  const [searching, setSearching] = useState(false)
+
+  const search = useCallback(async (pat?: string, dent?: string, m?: string) => {
+    setSearching(true)
+    const result = await searchAppointmentsForReturn({
+      patient_id: pat || undefined,
+      dentist_id: dent || undefined,
+      month: m ?? month,
+    })
+    if ("data" in result && result.data) setResults(result.data)
+    setSearching(false)
+  }, [month])
+
+  useEffect(() => {
+    if (open) {
+      setPatientId("")
+      setDentistId("")
+      setMonth(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`)
+      setResults([])
+    }
+  }, [open])
+
+  const prevMonth = () => {
+    const [y, m] = month.split("-").map(Number)
+    const d = new Date(y, m - 2, 1)
+    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+  }
+
+  const nextMonth = () => {
+    const [y, m] = month.split("-").map(Number)
+    const d = new Date(y, m, 1)
+    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+  }
+
+  const monthLabel = (() => {
+    const [y, m] = month.split("-").map(Number)
+    return format(new Date(y, m - 1, 1), "MMMM 'de' yyyy", { locale: ptBR })
+  })()
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Marcar Retorno</DialogTitle>
+          <DialogDescription>
+            Selecione o agendamento original ao qual este retorno será vinculado
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Mês</Label>
+            <div className="flex items-center gap-1">
+              <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={prevMonth}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-32 text-center text-sm font-medium capitalize">{monthLabel}</span>
+              <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={nextMonth}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs" htmlFor="return-patient">Paciente</Label>
+            <Select value={patientId} onValueChange={(v) => setPatientId(v ?? "")}>
+              <SelectTrigger id="return-patient" className="h-8 w-44">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os pacientes</SelectItem>
+                {patients.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs" htmlFor="return-dentist">Dentista</Label>
+            <Select value={dentistId} onValueChange={(v) => setDentistId(v ?? "")}>
+              <SelectTrigger id="return-dentist" className="h-8 w-44">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os dentistas</SelectItem>
+                {dentists.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button size="sm" onClick={() => search(patientId === "all" ? "" : patientId, dentistId === "all" ? "" : dentistId)}>
+            Buscar
+          </Button>
+        </div>
+
+        <div className="max-h-80 overflow-y-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Horário</TableHead>
+                <TableHead>Paciente</TableHead>
+                <TableHead>Dentista</TableHead>
+                <TableHead>Procedimento</TableHead>
+                <TableHead className="w-20 text-right">Ação</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {searching ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-20 text-center text-muted-foreground">Buscando...</TableCell>
+                </TableRow>
+              ) : results.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-20 text-center text-muted-foreground">Nenhum agendamento encontrado</TableCell>
+                </TableRow>
+              ) : (
+                results.map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="whitespace-nowrap">{format(new Date(a.start_time), "dd/MM/yyyy")}</TableCell>
+                    <TableCell className="whitespace-nowrap">{format(new Date(a.start_time), "HH:mm")} - {format(new Date(a.end_time), "HH:mm")}</TableCell>
+                    <TableCell>{a.patients?.name ?? "-"}</TableCell>
+                    <TableCell>{a.dentists?.name ?? "-"}</TableCell>
+                    <TableCell>{a.procedures?.name ?? "-"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => { onSelect(a); onOpenChange(false) }}>
+                        Selecionar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function AppointmentDialog({
   open,
   onOpenChange,
@@ -226,6 +400,7 @@ function AppointmentDialog({
   onDelete,
   createdPatientId,
   onPatientCreated,
+  returnToId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -239,6 +414,7 @@ function AppointmentDialog({
   onDelete?: (id: string) => void
   createdPatientId?: string | null
   onPatientCreated?: (patient: { id: string; name: string }) => void
+  returnToId?: string | null
 }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -302,6 +478,7 @@ function AppointmentDialog({
           className="flex flex-col gap-4"
         >
           {appointment && <input type="hidden" name="id" value={appointment.id} />}
+          {returnToId && <input type="hidden" name="return_to_id" value={returnToId} />}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
@@ -591,6 +768,8 @@ export function AgendaClient() {
 
   const [editAppointment, setEditAppointment] = useState<Appointment | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false)
+  const [returnToId, setReturnToId] = useState<string | null>(null)
   const [clickedHour, setClickedHour] = useState(8)
   const [clickedDate, setClickedDate] = useState(toDateInput(new Date()))
   const [createdPatientId, setCreatedPatientId] = useState<string | null>(null)
@@ -664,6 +843,7 @@ export function AgendaClient() {
   const handleCreate = (hour: number) => {
     setEditAppointment(null)
     setCreatedPatientId(null)
+    setReturnToId(null)
     setClickedHour(hour)
     setClickedDate(toDateInput(currentDate))
     setDialogOpen(true)
@@ -672,6 +852,7 @@ export function AgendaClient() {
   const handleSelectSlot = useCallback((slotInfo: SlotInfo) => {
     setEditAppointment(null)
     setCreatedPatientId(null)
+    setReturnToId(null)
     setClickedDate(toDateInput(slotInfo.start))
     setClickedHour(slotInfo.start.getHours())
     setDialogOpen(true)
@@ -681,6 +862,7 @@ export function AgendaClient() {
     const a = event.appointment
     setEditAppointment(a)
     setCreatedPatientId(null)
+    setReturnToId(null)
     setClickedHour(new Date(a.start_time).getHours())
     setClickedDate(toDateInput(new Date(a.start_time)))
     setDialogOpen(true)
@@ -692,6 +874,7 @@ export function AgendaClient() {
       : await createAppointment(formData)
     if (!result?.error) {
       toast.success(editAppointment ? "Agendamento atualizado" : "Agendamento criado")
+      setReturnToId(null)
       setDialogOpen(false)
       refreshData()
     } else {
@@ -814,7 +997,7 @@ export function AgendaClient() {
   return (
     <div className="flex gap-4">
       <div className="min-w-0 flex-1">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-stretch justify-between gap-3">
           <div className="inline-flex rounded-lg border bg-background p-0.5 shadow-sm">
             {views.map((v) => {
               const Icon = v.icon
@@ -823,7 +1006,7 @@ export function AgendaClient() {
                 <button
                   key={v.type}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+                    "inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-all",
                     isActive
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground",
@@ -837,10 +1020,16 @@ export function AgendaClient() {
             })}
           </div>
 
-          <Button size="sm" onClick={() => handleCreate(8)}>
-            <Plus className="h-4 w-4" />
-            Adicionar Evento
-          </Button>
+          <div className="flex items-stretch gap-2">
+            <Button className="h-full" onClick={() => handleCreate(8)}>
+              <Plus className="h-4 w-4" />
+              Adicionar Evento
+            </Button>
+            <Button className="h-full" variant="outline" onClick={() => setReturnDialogOpen(true)}>
+              <RotateCcw className="h-4 w-4" />
+              Marcar Retorno
+            </Button>
+          </div>
         </div>
 
         <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -956,7 +1145,7 @@ export function AgendaClient() {
           open={dialogOpen}
           onOpenChange={(o) => {
             setDialogOpen(o)
-            if (!o) { setEditAppointment(null); setCreatedPatientId(null) }
+            if (!o) { setEditAppointment(null); setCreatedPatientId(null); setReturnToId(null) }
           }}
           appointment={editAppointment}
           defaultDate={clickedDate}
@@ -970,6 +1159,22 @@ export function AgendaClient() {
           onPatientCreated={({ id, name }) => {
             setPatients((prev) => [...prev, { id, name, cpf: null, phone: null, birth_date: null, notes: null, active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() } as Patient])
             setCreatedPatientId(id)
+          }}
+          returnToId={returnToId}
+        />
+
+        <ReturnDialog
+          open={returnDialogOpen}
+          onOpenChange={setReturnDialogOpen}
+          patients={patients}
+          dentists={dentists}
+          onSelect={(appt) => {
+            setEditAppointment(null)
+            setCreatedPatientId(null)
+            setReturnToId(appt.id)
+            setClickedDate(toDateInput(new Date(appt.start_time)))
+            setClickedHour(new Date(appt.start_time).getHours())
+            setDialogOpen(true)
           }}
         />
       </div>

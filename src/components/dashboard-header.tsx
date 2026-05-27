@@ -4,14 +4,16 @@ import { Button } from "@/components/ui/button"
 import { useSupabase } from "@/components/providers/supabase-provider"
 import { useTheme } from "next-themes"
 import Link from "next/link"
-import { Bell, Menu, Moon, Plus, Search, Sun } from "lucide-react"
+import { Bell, Menu, Moon, PanelLeftClose, PanelLeftOpen, Plus, Search, Sun } from "lucide-react"
 import { useEffect, useState } from "react"
 
 interface DashboardHeaderProps {
   onMenuToggle?: () => void
+  collapsed?: boolean
+  onToggleCollapse?: () => void
 }
 
-export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
+export function DashboardHeader({ onMenuToggle, collapsed, onToggleCollapse }: DashboardHeaderProps) {
   const { user } = useSupabase()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -40,18 +42,18 @@ export function DashboardHeader({ onMenuToggle }: DashboardHeaderProps) {
         {/* Left side */}
         <div className="flex items-center gap-3">
           <button
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+            onClick={() => onToggleCollapse?.()}
+            title={collapsed ? "Expandir sidebar" : "Retrair sidebar"}
+          >
+            {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
+          <button
             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
             onClick={() => onMenuToggle?.()}
           >
             <Menu className="h-4 w-4" />
           </button>
-          {/* <div className="relative hidden h-9 w-72 items-center rounded-lg border border-input bg-muted/40 pl-9 pr-4 text-sm text-muted-foreground/50 sm:flex">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
-            <span>Buscar...</span>
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
-              Ctrl K
-            </span>
-          </div> */}
         </div>
 
         {/* Right side */}
