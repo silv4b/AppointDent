@@ -73,6 +73,33 @@ async function checkOverlap(
   return null
 }
 
+export async function searchAppointmentsForReturn(params: {
+  patient_id?: string
+  dentist_id?: string
+  month: string
+}) {
+  const { supabase } = await requireAuth()
+
+  const { patient_id, dentist_id, month } = params
+  const startOfMonth = `${month}-01T00:00:00Z`
+  const endDate = new Date(new Date(month + "-01").getFullYear(), new Date(month + "-01").getMonth() + 1, 0).getDate()
+  const endOfMonth = `${month}-${String(endDate).padStart(2, "0")}T23:59:59Z`
+
+  let query = supabase
+    .from("appointments")
+    .select("*, patients!inner(name), dentists!inner(name), procedures(name, color, duration_minutes)")
+    .gte("start_time", startOfMonth)
+    .lte("start_time", endOfMonth)
+    .order("start_time")
+
+  if (patient_id) query = query.eq("patient_id", patient_id)
+  if (dentist_id) query = query.eq("dentist_id", dentist_id)
+
+  const { data } = await query
+
+  return ok(data ?? [])
+}
+
 export async function createAppointment(formData: FormData) {
   const { supabase } = await requireAuth()
 
@@ -80,7 +107,7 @@ export async function createAppointment(formData: FormData) {
   const parsed = appointmentSchema.safeParse(raw)
   if (!parsed.success) return err(parsed.error.issues.map((e) => e.message).join(", "))
 
-  const { patient_id, dentist_id, procedure_id, start_time: startTimeLocal, end_time: endTimeLocal, notes } = parsed.data
+  const { patient_id, dentist_id, procedure_id, start_time: startTimeLocal, end_time: endTimeLocal, notes, return_to_id } = parsed.data
 
   const startTime = new Date(startTimeLocal).toISOString()
   let endTime: string
@@ -115,6 +142,7 @@ export async function createAppointment(formData: FormData) {
     end_time: endTime,
     notes: notes || null,
     status: "scheduled",
+    return_to_id: return_to_id || null,
   })
 
   if (error) return err(error.message)
@@ -129,7 +157,7 @@ export async function updateAppointment(formData: FormData) {
   const parsed = appointmentUpdateSchema.safeParse(raw)
   if (!parsed.success) return err(parsed.error.issues.map((e) => e.message).join(", "))
 
-  const { id, patient_id, dentist_id, procedure_id, start_time: startTimeLocal, end_time: endTimeLocal, notes, status } = parsed.data
+  const { id, patient_id, dentist_id, procedure_id, start_time: startTimeLocal, end_time: endTimeLocal, notes, status, return_to_id } = parsed.data
 
   const startTime = new Date(startTimeLocal).toISOString()
   const endTime = endTimeLocal ? new Date(endTimeLocal).toISOString() : startTime
@@ -147,6 +175,7 @@ export async function updateAppointment(formData: FormData) {
       end_time: endTime,
       notes: notes || null,
       status: status || "scheduled",
+      return_to_id: return_to_id || null,
     })
     .eq("id", id)
 
