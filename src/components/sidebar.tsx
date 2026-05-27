@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { logout } from "@/lib/supabase/actions"
 import { cn } from "@/lib/utils"
 import { useSupabase } from "@/components/providers/supabase-provider"
+import { createClient } from "@/lib/supabase/client"
 import {
+  BookOpen,
   Calendar,
   ChevronLeft,
   ChevronsLeft,
@@ -32,30 +34,6 @@ type NavSection = {
   items: NavItem[]
 }
 
-const navSections: NavSection[] = [
-  {
-    label: "Principal",
-    items: [
-      { href: "/", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/agenda", label: "Agenda", icon: Calendar },
-    ],
-  },
-  {
-    label: "Cadastros",
-    items: [
-      { href: "/pacientes", label: "Pacientes", icon: Users },
-      { href: "/dentistas", label: "Dentistas", icon: Stethoscope },
-      { href: "/procedimentos", label: "Procedimentos", icon: Syringe },
-    ],
-  },
-  {
-    label: "Configurações",
-    items: [
-      { href: "/horarios", label: "Grade de Horários", icon: Clock },
-    ],
-  },
-]
-
 function getInitials(name?: string | null, email?: string | null): string {
   if (name) {
     return name
@@ -80,10 +58,54 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname()
   const { user } = useSupabase()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [role, setRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!user) return
+    const supabase = createClient()
+    supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data }) => {
+      if (data) setRole(data.role)
+    })
+  }, [user])
 
   const userName = user?.user_metadata?.name as string | undefined
   const userEmail = user?.email ?? null
   const initials = getInitials(userName, userEmail)
+
+  const isDentist = role === "dentist"
+
+  const navSections: NavSection[] = [
+    {
+      label: "Principal",
+      items: [
+        ...(isDentist
+          ? [{ href: "/minha-agenda", label: "Minha Agenda", icon: Calendar as typeof LayoutDashboard }]
+          : [{ href: "/", label: "Dashboard", icon: LayoutDashboard as typeof LayoutDashboard }]
+        ),
+        { href: "/agenda", label: "Agenda Geral", icon: Calendar as typeof LayoutDashboard },
+      ],
+    },
+    {
+      label: "Clínico",
+      items: [
+        { href: "/anamnese", label: "Anamnese", icon: BookOpen as typeof LayoutDashboard },
+      ],
+    },
+    ...(isDentist ? [] : [{
+      label: "Cadastros",
+      items: [
+        { href: "/pacientes", label: "Pacientes", icon: Users as typeof LayoutDashboard },
+        { href: "/dentistas", label: "Dentistas", icon: Stethoscope as typeof LayoutDashboard },
+        { href: "/procedimentos", label: "Procedimentos", icon: Syringe as typeof LayoutDashboard },
+      ],
+    }] as NavSection[]),
+    ...(isDentist ? [] : [{
+      label: "Configurações",
+      items: [
+        { href: "/horarios", label: "Grade de Horários", icon: Clock as typeof LayoutDashboard },
+      ],
+    }] as NavSection[]),
+  ]
 
   function NavItem({ href, label, icon: Icon }: NavItem) {
     const isActive = pathname === href

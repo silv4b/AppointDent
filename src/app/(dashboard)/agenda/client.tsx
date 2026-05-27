@@ -775,6 +775,20 @@ export function AgendaClient() {
   const [createdPatientId, setCreatedPatientId] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage("agenda:sidebarCollapsed", false)
 
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data: profile }) => {
+        if (profile?.role === "dentist") {
+          supabase.from("dentists").select("id").eq("profile_id", user.id).single().then(({ data: dentist }) => {
+            if (dentist) setSelectedDentist(dentist.id)
+          })
+        }
+      })
+    })
+  }, [])
+
   const fetchRange = useCallback(async (start: Date, end: Date) => {
     const supabase = createClient()
     const startStr = toDateInput(start)
