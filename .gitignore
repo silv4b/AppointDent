@@ -40,6 +40,9 @@ yarn-error.log*
 # netlify
 .netlify
 
+# database backups
+.db_backups/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

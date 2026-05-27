@@ -9,3 +9,22 @@ This version has breaking changes — APIs, conventions, and file structure may 
 Before staging any changes, read `docs/batched-commits.md` and follow the
 4-step protocol: analyze → group → present → execute only on user approval.
 Never push — the user does that manually.
+
+## Database backup
+
+When the user requests a database backup, run:
+
+```powershell
+# Create date-named folder
+$date = Get-Date -Format "yyyy-MM-dd"
+$dir = ".db_backups/$date"
+New-Item -ItemType Directory -Path $dir -Force
+
+# Full dump
+npx supabase db dump -f "$dir/backup-completo.sql"
+
+# Schema only
+npx supabase db dump --schema-only -f "$dir/backup-schema.sql"
+```
+
+Both files are saved inside `.db_backups/<AAAA-MM-DD>/`. The directory is gitignored.
