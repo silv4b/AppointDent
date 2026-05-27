@@ -71,5 +71,10 @@ export type PatientInput = z.infer<typeof patientSchema>
 export type QuickPatientInput = z.infer<typeof quickPatientSchema>
 export type DentistInput = z.infer<typeof dentistSchema>
 export type ProcedureInput = z.infer<typeof procedureSchema>
+export const anamneseSessionSchema = z.object({
+  appointment_id: z.string().uuid("Agendamento inválido"),
+  notes: z.string().max(5000).nullable().optional(),
+})
+
 export type AppointmentInput = z.infer<typeof appointmentSchema>
 export type AvailabilitySlotInput = z.infer<typeof availabilitySlotSchema>
