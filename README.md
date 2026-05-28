@@ -1,4 +1,4 @@
-# AppointDent
+# AppointDent <img src="assets/tooth-icon.png" alt="Ícone" width="32" height="32" />
 
 Sistema de agendamento odontológico com gestão de pacientes, dentistas, procedimentos e agenda visual com calendário interativo. Desenvolvido para clínicas e consultórios que precisam de uma ferramenta moderna e eficiente.
 
@@ -117,11 +117,22 @@ Abra [http://localhost:3000](http://localhost:3000).
 
 ### Acessos de teste
 
+Após `npx supabase db reset`, utilize:
+
 | Email | Senha | Role |
 |-------|-------|------|
-| <admin@odonto.com> | Admin@123 | admin |
-| <dentista@odonto.com> | Dent@123 | dentist |
-| <secretaria@odonto.com> | Sec@123 | receptionist |
+| <admin@odonto.com> | 123456 | admin |
+| <secretaria@odonto.com> | 123456 | receptionist |
+| <dentista1@odonto.com> | 123456 | dentist |
+| <dentista2@odonto.com> | 123456 | dentist |
+| <dentista3@odonto.com> | 123456 | dentist |
+| <dentista4@odonto.com> | 123456 | dentist |
+| <dentista5@odonto.com> | 123456 | dentist |
+
+> **Produção:** O primeiro acesso admin é criado via SQL durante o deploy.
+> Consulte [`supabase/criar-admin.sql`](supabase/criar-admin.sql) para instruções.
+> Após o login, o admin pode criar novos usuários (dentistas/secretárias)
+> diretamente pelo menu **Configurações > Usuários**.
 
 ---
 
@@ -142,7 +153,7 @@ Abra [http://localhost:3000](http://localhost:3000).
 
 ## Estrutura do Projeto
 
-```
+```text
 src/
 ├── app/
 │   ├── (dashboard)/           # Rotas protegidas (com sidebar)
@@ -151,7 +162,8 @@ src/
 │   │   ├── pacientes/          # CRUD Pacientes
 │   │   ├── dentistas/          # CRUD Dentistas
 │   │   ├── procedimentos/      # CRUD Procedimentos
-│   │   └── horarios/           # Grade de horários por dentista
+│   │   ├── horarios/           # Grade de horários por dentista
+│   │   └── admin/usuarios/     # Admin: gerenciar contas de acesso
 │   ├── login/                  # Página de login
 │   ├── auth/callback/          # Callback OAuth
 │   ├── layout.tsx              # Layout raiz
@@ -169,7 +181,7 @@ src/
 │   ├── supabase/
 │   │   ├── client.ts           # Cliente Supabase (browser)
 │   │   ├── server.ts           # Cliente Supabase (server)
-│   │   ├── middleware.ts        # Auth middleware
+│   │   ├── middleware.ts       # Auth middleware
 │   │   ├── actions.ts          # Auth (login, signup, logout)
 │   │   └── guard.ts            # requireAuth() helper
 │   ├── actions/
@@ -177,7 +189,9 @@ src/
 │   │   ├── patients.ts         # CRUD pacientes + quick-create
 │   │   ├── dentists.ts         # CRUD dentistas
 │   │   ├── procedures.ts       # CRUD procedimentos
-│   │   └── availability-slots.ts # CRUD grade de horários
+│   │   ├── availability-slots.ts # CRUD grade de horários
+│   │   ├── admin.ts            # Admin: criar/listar usuários via RPC
+│   │   └── notifications.ts    # Notificações
 │   ├── schemas/
 │   │   └── index.ts            # Schemas zod
 │   └── utils/
@@ -190,9 +204,16 @@ src/
 supabase/
 ├── migrations/
 │   ├── 00001_initial_schema.sql
-│   └── 00002_role_based_rls.sql
+│   ├── 00002_role_based_rls.sql
+│   ├── 00003_add_return_to_id.sql
+│   ├── 00004_anamnese_sessions.sql
+│   ├── 00005_anamnese_sessions_title.sql
+│   ├── 00006_anamnese_sessions_fields.sql
+│   ├── 00007_notifications.sql
+│   └── 00008_admin_usuarios.sql
 ├── config.toml
-└── seed.sql
+├── seed.sql
+└── criar-admin.sql              # Função para criar admin em produção
 ```
 
 ---

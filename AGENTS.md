@@ -28,3 +28,7 @@ npx supabase db dump --schema-only -f "$dir/backup-schema.sql"
 ```
 
 Both files are saved inside `.db_backups/<AAAA-MM-DD>/`. The directory is gitignored.
+
+## Pagination
+
+All tables in the system (current and future) **must** have pagination on their listing pages. Use server-side pagination with `LIMIT`/`OFFSET` (SQL) or `.range()` (Supabase JS). Default page size: 20 records. Include page size selector (20/50/100) and total record count display.
