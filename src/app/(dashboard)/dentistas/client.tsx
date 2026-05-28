@@ -21,7 +21,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { Database } from "@/types/database"
 import { ConfirmDialog } from "@/components/confirm-dialog"
-import { Pencil, Plus, Search, Trash2, X } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, Pencil, Plus, Search, Trash2, X } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
@@ -34,9 +34,11 @@ export function DentistsClient() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
   const [search, setSearch] = useState("")
+  const [sortColumn, setSortColumn] = useState<"name" | "specialty" | "email" | "active">("name")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetch = useCallback(async (p?: number, ps?: number, s?: string) => {
@@ -71,6 +73,25 @@ export function DentistsClient() {
     setPage(1)
     fetch(1)
   }
+
+  const toggleSort = (col: typeof sortColumn) => {
+    if (sortColumn === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setSortColumn(col)
+      setSortDir("asc")
+    }
+  }
+
+  const sorted = [...dentists].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1
+    if (sortColumn === "active") {
+      return ((a.active ? 1 : 0) - (b.active ? 1 : 0)) * dir
+    }
+    const aVal = (a[sortColumn] ?? "").toString()
+    const bVal = (b[sortColumn] ?? "").toString()
+    return aVal.localeCompare(bVal, "pt-BR") * dir
+  })
 
   return (
     <div>
@@ -111,11 +132,31 @@ export function DentistsClient() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Especialidade</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
+                <div className="flex items-center gap-1">
+                  Nome
+                  {sortColumn === "name" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("specialty")}>
+                <div className="flex items-center gap-1">
+                  Especialidade
+                  {sortColumn === "specialty" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                </div>
+              </TableHead>
               <TableHead>Telefone</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Ativo</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("email")}>
+                <div className="flex items-center gap-1">
+                  Email
+                  {sortColumn === "email" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("active")}>
+                <div className="flex items-center gap-1">
+                  Ativo
+                  {sortColumn === "active" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                </div>
+              </TableHead>
               <TableHead className="w-24 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -133,7 +174,7 @@ export function DentistsClient() {
                 </TableCell>
               </TableRow>
             ) : (
-              dentists.map((d) => (
+              sorted.map((d) => (
                 <TableRow key={d.id}>
                   <TableCell className="font-medium">{d.name}</TableCell>
                   <TableCell className="text-muted-foreground">{d.specialty ?? "-"}</TableCell>

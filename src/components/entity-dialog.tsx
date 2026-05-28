@@ -17,7 +17,7 @@ import { toast } from "sonner"
 export interface Field {
   name: string
   label: string
-  type?: "text" | "email" | "number" | "date" | "tel" | "color" | "hidden"
+  type?: "text" | "email" | "number" | "date" | "tel" | "color" | "hidden" | "checkbox"
   placeholder?: string
   defaultValue?: string
   required?: boolean
@@ -73,6 +73,23 @@ export function EntityDialog({
                 name={field.name}
                 defaultValue={field.defaultValue}
               />
+            ) : field.type === "checkbox" ? (
+              <div key={field.name} className="flex items-center gap-2">
+                <input
+                  type="hidden"
+                  name={field.name}
+                  value="off"
+                />
+                <input
+                  id={field.name}
+                  type="checkbox"
+                  name={field.name}
+                  value="on"
+                  defaultChecked={field.defaultValue === "on"}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <Label htmlFor={field.name}>{field.label}</Label>
+              </div>
             ) : (
               <div key={field.name} className="flex flex-col gap-2">
                 <Label htmlFor={field.name}>{field.label}</Label>

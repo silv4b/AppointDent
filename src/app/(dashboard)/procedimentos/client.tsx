@@ -21,7 +21,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { Database } from "@/types/database"
 import { ConfirmDialog } from "@/components/confirm-dialog"
-import { Pencil, Plus, Search, Trash2, X } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, Pencil, Plus, Search, Trash2, X } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
@@ -34,9 +34,11 @@ export function ProceduresClient() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
   const [search, setSearch] = useState("")
+  const [sortColumn, setSortColumn] = useState<"name" | "duration_minutes" | "price" | "active">("name")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetch = useCallback(async (p?: number, ps?: number, s?: string) => {
@@ -71,6 +73,31 @@ export function ProceduresClient() {
     setPage(1)
     fetch(1)
   }
+
+  const toggleSort = (col: typeof sortColumn) => {
+    if (sortColumn === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setSortColumn(col)
+      setSortDir("asc")
+    }
+  }
+
+  const sorted = [...procedures].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1
+    if (sortColumn === "duration_minutes") {
+      return ((a.duration_minutes ?? 0) - (b.duration_minutes ?? 0)) * dir
+    }
+    if (sortColumn === "price") {
+      return ((a.price ?? 0) - (b.price ?? 0)) * dir
+    }
+    if (sortColumn === "active") {
+      return ((a.active ? 1 : 0) - (b.active ? 1 : 0)) * dir
+    }
+    const aVal = (a[sortColumn] ?? "").toString()
+    const bVal = (b[sortColumn] ?? "").toString()
+    return aVal.localeCompare(bVal, "pt-BR") * dir
+  })
 
   const formatPrice = (price: number | null) => {
     if (price === null) return "-"
@@ -119,10 +146,30 @@ export function ProceduresClient() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Procedimento</TableHead>
-              <TableHead>Duração</TableHead>
-              <TableHead>Valor</TableHead>
-              <TableHead>Ativo</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
+                <div className="flex items-center gap-1">
+                  Procedimento
+                  {sortColumn === "name" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("duration_minutes")}>
+                <div className="flex items-center gap-1">
+                  Duração
+                  {sortColumn === "duration_minutes" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("price")}>
+                <div className="flex items-center gap-1">
+                  Valor
+                  {sortColumn === "price" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("active")}>
+                <div className="flex items-center gap-1">
+                  Ativo
+                  {sortColumn === "active" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                </div>
+              </TableHead>
               <TableHead className="w-24 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -140,7 +187,7 @@ export function ProceduresClient() {
                 </TableCell>
               </TableRow>
             ) : (
-              procedures.map((p) => (
+              sorted.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">

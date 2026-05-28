@@ -6,6 +6,7 @@ export const patientSchema = z.object({
   phone: z.string().max(20).nullable().optional(),
   birth_date: z.string().max(10).nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
+  active: z.preprocess((v) => v === "on" || v === true, z.boolean()).optional().default(true),
 })
 
 export const quickPatientSchema = z.object({
@@ -67,6 +68,24 @@ export const signupSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório").max(200),
 })
 
+export const createUserSchema = z.object({
+  name: z.string().min(1, "Nome é obrigatório").max(200),
+  email: z.string().email("Email inválido"),
+  password: z
+    .string()
+    .min(8, "Senha deve ter no mínimo 8 caracteres")
+    .regex(/[A-Z]/, "Senha deve conter pelo menos uma letra maiúscula")
+    .regex(/[0-9]/, "Senha deve conter pelo menos um número"),
+  confirmPassword: z.string().min(1, "Confirme a senha"),
+  role: z.enum(["admin", "dentist", "receptionist"], {
+    errorMap: () => ({ message: "Selecione uma função" }),
+  } as any),
+  specialty: z.string().max(100).optional().nullable(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Senhas não conferem",
+  path: ["confirmPassword"],
+})
+
 export type PatientInput = z.infer<typeof patientSchema>
 export type QuickPatientInput = z.infer<typeof quickPatientSchema>
 export type DentistInput = z.infer<typeof dentistSchema>
@@ -91,6 +110,21 @@ export const anamneseSessionSchema = z.object({
     z.array(AnamneseFieldSchema).default([]),
   ),
   notes: z.string().max(5000).nullable().optional(),
+})
+
+export const anamneseSessionUpdateSchema = anamneseSessionSchema.extend({
+  id: z.string().uuid(),
+  title: z.string().min(1, "Título é obrigatório").max(200).optional(),
+  fields: z.preprocess(
+    (v) => {
+      if (typeof v === "string") {
+        try { return JSON.parse(v) } catch { return [] }
+      }
+      return v ?? []
+    },
+    z.array(AnamneseFieldSchema).optional(),
+  ),
+  patient_id: z.string().uuid("Paciente inválido").optional(),
 })
 
 export type AppointmentInput = z.infer<typeof appointmentSchema>

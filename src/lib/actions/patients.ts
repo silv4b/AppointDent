@@ -31,6 +31,7 @@ export async function createPatient(formData: FormData) {
       phone: parsed.data.phone || null,
       birth_date: parsed.data.birth_date || null,
       notes: parsed.data.notes || null,
+      active: parsed.data.active ?? true,
     })
     .select("id, name")
     .single()
@@ -75,6 +76,7 @@ export async function updatePatient(formData: FormData) {
     phone: fields.phone || null,
     birth_date: fields.birth_date || null,
     notes: fields.notes || null,
+    active: fields.active,
   }).eq("id", id)
 
   if (error) return err(error.message)
