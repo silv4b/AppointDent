@@ -124,67 +124,66 @@ BEGIN
   END LOOP;
 END $$;
 
--- 7. AGENDAMENTOS (appointments) — 60 agendamentos distribuídos nos últimos 30 dias e próximos 30 dias
+-- 7. AGENDAMENTOS (appointments) — 12 por dentista, sem overlaps
 DO $$
 DECLARE
-  p_ids UUID[]; d_ids UUID[]; pr_ids UUID[];
-  p_id UUID; d_id UUID; pr_id UUID;
-  day_offset INT; base_hour INT; slot_start TIMESTAMPTZ; slot_end TIMESTAMPTZ;
-  durations INT[]; dur INT; statuses TEXT[]; st TEXT;
-  i INT; patient_idx INT; dentist_idx INT; proc_idx INT;
-  used_slots TEXT[];
-  slot_key TEXT;
+  d_ids UUID[]; p_ids UUID[]; pr_ids UUID[];
+  d_id UUID; p_id UUID; pr_id UUID;
+  day_offset INT; slot_start TIMESTAMPTZ; slot_end TIMESTAMPTZ;
+  dur INT; st TEXT; i INT; attempts INT;
+  used tstzrange[];
+  statuses TEXT[] := ARRAY['scheduled', 'confirmed', 'completed', 'completed', 'completed', 'completed', 'cancelled'];
+  hours INT[] := ARRAY[8, 9, 10, 11, 14, 15, 16];
 BEGIN
-  -- Coletar IDs
   SELECT ARRAY(SELECT id FROM patients ORDER BY name) INTO p_ids;
   SELECT ARRAY(SELECT id FROM dentists ORDER BY name) INTO d_ids;
   SELECT ARRAY(SELECT id FROM procedures ORDER BY name) INTO pr_ids;
-  durations := ARRAY[30, 45, 60, 90, 120];
-  statuses := ARRAY['scheduled', 'confirmed', 'completed', 'completed', 'completed', 'completed', 'cancelled'];
 
-  -- Gerar 60 agendamentos entre D-30 e D+30
-  FOR i IN 1..60 LOOP
-    -- Selecionar aleatoriamente paciente, dentista, procedimento
-    patient_idx := 1 + floor(random() * array_length(p_ids, 1))::int;
-    dentist_idx := 1 + floor(random() * array_length(d_ids, 1))::int;
-    proc_idx := 1 + floor(random() * array_length(pr_ids, 1))::int;
+  FOREACH d_id IN ARRAY d_ids LOOP
+    used := ARRAY[]::tstzrange[];
+    i := 0;
 
-    p_id := p_ids[patient_idx];
-    d_id := d_ids[dentist_idx];
-    pr_id := pr_ids[proc_idx];
+    WHILE i < 12 LOOP
+      attempts := 0;
 
-    -- Dia aleatório entre -30 e +30 (exceto domingo = 0)
-    day_offset := -30 + floor(random() * 61)::int;
-    IF EXTRACT(DOW FROM CURRENT_DATE + day_offset) = 0 THEN
-      day_offset := day_offset + 1;
-    END IF;
+      <<find_slot>>
+      LOOP
+        attempts := attempts + 1;
+        IF attempts > 200 THEN EXIT find_slot; END IF;
 
-    -- Horário base entre 8 e 17
-    base_hour := 8 + floor(random() * 10)::int;
-    slot_start := (CURRENT_DATE + day_offset) + (base_hour::TEXT || ':00')::TIME;
-    dur := durations[1 + floor(random() * array_length(durations, 1))::int];
-    slot_end := slot_start + (dur || ' minutes')::INTERVAL;
+        p_id := p_ids[1 + floor(random() * array_length(p_ids, 1))::int];
+        pr_id := pr_ids[1 + floor(random() * array_length(pr_ids, 1))::int];
 
-    -- Evitar duplicação de slot para o mesmo dentista
-    slot_key := d_id || '|' || slot_start::TEXT || '|' || slot_end::TEXT;
-    IF slot_key = ANY(used_slots) THEN
-      CONTINUE;
-    END IF;
-    used_slots := array_append(used_slots, slot_key);
+        day_offset := -30 + floor(random() * 61)::int;
+        IF EXTRACT(DOW FROM CURRENT_DATE + day_offset) = 0 THEN
+          day_offset := day_offset + 1;
+        END IF;
 
-    -- Status: se passado, pode ser completed ou cancelled; se futuro, scheduled ou confirmed
-    IF day_offset < 0 THEN
-      st := statuses[1 + floor(random() * 7)::int];
-    ELSIF day_offset = 0 THEN
-      st := statuses[1 + floor(random() * 2)::int];
-    ELSE
-      st := statuses[1 + floor(random() * 2)::int];
-    END IF;
+        slot_start := (CURRENT_DATE + day_offset)
+          + (hours[1 + floor(random() * array_length(hours, 1))::int]::TEXT || ':00')::TIME;
+        dur := (ARRAY[30, 45, 60])[1 + floor(random() * 3)::int];
+        slot_end := slot_start + (dur || ' minutes')::INTERVAL;
 
-    INSERT INTO appointments (patient_id, dentist_id, procedure_id, start_time, end_time, status, notes)
-    VALUES (p_id, d_id, pr_id, slot_start, slot_end, st,
-      CASE WHEN random() < 0.3 THEN 'Observação gerada automaticamente para demonstração.' ELSE NULL END
-    );
+        IF NOT EXISTS (SELECT 1 FROM unnest(used) r WHERE r && tstzrange(slot_start, slot_end)) THEN
+          used := array_append(used, tstzrange(slot_start, slot_end));
+          EXIT find_slot;
+        END IF;
+      END LOOP;
 
+      IF attempts > 200 THEN EXIT; END IF;
+
+      IF day_offset < 0 THEN
+        st := statuses[1 + floor(random() * 7)::int];
+      ELSE
+        st := statuses[1 + floor(random() * 2)::int];
+      END IF;
+
+      INSERT INTO appointments (patient_id, dentist_id, procedure_id, start_time, end_time, status, notes)
+      VALUES (p_id, d_id, pr_id, slot_start, slot_end, st,
+        CASE WHEN random() < 0.3 THEN 'Observação gerada automaticamente para demonstração.' ELSE NULL END
+      );
+
+      i := i + 1;
+    END LOOP;
   END LOOP;
 END $$;
