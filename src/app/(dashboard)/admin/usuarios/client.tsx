@@ -133,8 +133,8 @@ function CriarUsuarioDialog({
           <div className="flex flex-col gap-2">
             <Label htmlFor="user-role">Função</Label>
             <Select value={role} onValueChange={(v) => setRole(v ?? "")}>
-              <SelectTrigger id="user-role">
-                <SelectValue placeholder="Selecione..." />
+              <SelectTrigger id="user-role" className="w-full">
+                <span className="flex flex-1 text-left">{role ? roleLabel[role] ?? role : <span className="text-muted-foreground">Selecione...</span>}</span>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Administrador</SelectItem>
@@ -173,6 +173,7 @@ function EditarUsuarioDialog({
 }) {
   const [name, setName] = useState(user?.name ?? "")
   const [role, setRole] = useState(user?.role ?? "")
+  const [email, setEmail] = useState(user?.email ?? "")
   const [specialty, setSpecialty] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -186,6 +187,7 @@ function EditarUsuarioDialog({
     const form = new FormData()
     form.set("userId", user.id)
     form.set("name", name)
+    form.set("email", email)
     form.set("role", role)
     if (role === "dentist") form.set("specialty", specialty)
     if (password) {
@@ -218,14 +220,14 @@ function EditarUsuarioDialog({
             <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="flex flex-col gap-2">
-            <Label>Email</Label>
-            <Input value={user?.email ?? ""} disabled className="bg-muted" />
+            <Label htmlFor="edit-email">Email</Label>
+            <Input id="edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="edit-role">Função</Label>
             <Select value={role} onValueChange={(v) => setRole(v ?? "")}>
-              <SelectTrigger id="edit-role">
-                <SelectValue placeholder="Selecione..." />
+              <SelectTrigger id="edit-role" className="w-full">
+                <span className="flex flex-1 text-left">{role ? roleLabel[role] ?? role : <span className="text-muted-foreground">Selecione...</span>}</span>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="admin">Administrador</SelectItem>
