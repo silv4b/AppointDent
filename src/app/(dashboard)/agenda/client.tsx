@@ -1,8 +1,8 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/confirm-dialog"
+import { EventTooltip } from "@/components/event-tooltip"
 import {
   Dialog,
   DialogContent,
@@ -58,9 +58,14 @@ import {
   subMonths,
 } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  FileText,
   Plus,
   RotateCcw,
   Trash2,
@@ -92,6 +97,7 @@ import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop"
 import type { EventInteractionArgs } from "react-big-calendar/lib/addons/dragAndDrop"
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css"
 import "@/components/shadcn-big-calendar.css"
+import TimeGrid from "react-big-calendar/lib/TimeGrid"
 
 type Appointment = Database["public"]["Tables"]["appointments"]["Row"] & {
   patients: { name: string } | null
@@ -128,12 +134,13 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelado",
 }
 
-type ViewType = "day" | "week" | "month" | "agenda"
+type ViewType = "day" | "week" | "month" | "agenda" | "threeDay"
 
 const views: { type: ViewType; label: string; icon: typeof List }[] = [
   { type: "day", label: "Dia", icon: List },
-  { type: "week", label: "Semana", icon: Columns2 },
-  { type: "month", label: "Mês", icon: Grid2x2 },
+  { type: "threeDay", label: "3 Dias", icon: Columns2 },
+  { type: "week", label: "Semana", icon: Grid2x2 },
+  { type: "month", label: "Mês", icon: CalendarDays },
   { type: "agenda", label: "Lista", icon: CalendarRange },
 ]
 
@@ -165,6 +172,49 @@ function toDateTimeLocal(d: Date): string {
 }
 
 // ============================================================
+// ThreeDay View (custom view for react-big-calendar)
+// ============================================================
+function ThreeDayView({ date, localizer, min, max, scrollToTime, enableAutoScroll, ...props }: any) {
+  const range = ThreeDayView.range(date, { localizer })
+  return (
+    <TimeGrid
+      {...props}
+      range={range}
+      eventOffset={15}
+      localizer={localizer}
+      min={min ?? localizer.startOf(new Date(), 'day')}
+      max={max ?? localizer.endOf(new Date(), 'day')}
+      scrollToTime={scrollToTime ?? localizer.startOf(new Date(), 'day')}
+      enableAutoScroll={enableAutoScroll ?? true}
+    />
+  )
+}
+
+ThreeDayView.range = (date: Date, { localizer }: any) => {
+  const start = localizer.add(date, -1, 'day')
+  const end = localizer.add(date, 1, 'day')
+  return localizer.range(start, end)
+}
+
+ThreeDayView.navigate = (date: Date, action: string, { localizer }: any) => {
+  switch (action) {
+    case 'PREV':
+      return localizer.add(date, -3, 'day')
+    case 'NEXT':
+      return localizer.add(date, 3, 'day')
+    default:
+      return date
+  }
+}
+
+ThreeDayView.title = (date: Date, { localizer }: any) => {
+  const range = ThreeDayView.range(date, { localizer })
+  const start = range[0]
+  const end = range[range.length - 1]
+  return `${localizer.format(start, 'dd/MM')} - ${localizer.format(end, 'dd/MM')}`
+}
+
+// ============================================================
 // Appointment Dialog
 // ============================================================
 function QuickPatientDialog({
@@ -174,7 +224,7 @@ function QuickPatientDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreated: (patient: { id: string; name: string }) => void
+  onCreated: (patient: { id: string; name: string; email: string | null }) => void
 }) {
   const [saving, setSaving] = useState(false)
 
@@ -208,6 +258,10 @@ function QuickPatientDialog({
           <div className="flex flex-col gap-2">
             <Label htmlFor="quick-phone">Telefone</Label>
             <Input id="quick-phone" name="phone" type="tel" placeholder="(00) 00000-0000" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="quick-email">Email</Label>
+            <Input id="quick-email" name="email" type="email" placeholder="paciente@exemplo.com" />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -419,11 +473,12 @@ function AppointmentDialog({
   onDelete?: (id: string) => void
   onCreateReturn?: (appointment: Appointment) => void
   createdPatientId?: string | null
-  onPatientCreated?: (patient: { id: string; name: string }) => void
+  onPatientCreated?: (patient: { id: string; name: string; email: string | null }) => void
   returnToId?: string | null
   userRole?: string | null
   currentDentistId?: string | null
 }) {
+  const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedProcedure, setSelectedProcedure] = useState(appointment?.procedure_id ?? "")
@@ -686,7 +741,7 @@ function AppointmentDialog({
 
           {appointment && (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status">Situação</Label>
               <Select
                 name="status"
                 defaultValue={appointment.status}
@@ -709,11 +764,15 @@ function AppointmentDialog({
           <DialogFooter className="gap-2">
             {appointment && (
               <>
-                <Button type="button" variant="outline" size="sm" onClick={() => onCreateReturn?.(appointment)}>
+                <Button type="button" variant="outline" onClick={() => router.push(`/anamnese/${appointment.patient_id}?appointmentId=${appointment.id}`)}>
+                  <FileText className="mr-1 h-3 w-3" />
+                  Anamnese
+                </Button>
+                <Button type="button" variant="outline" onClick={() => onCreateReturn?.(appointment)}>
                   <RotateCcw className="mr-1 h-3 w-3" />
                   Criar Retorno
                 </Button>
-                <Button type="button" variant="destructive" size="sm" onClick={() => setConfirmDeleteOpen(true)}>
+                <Button type="button" variant="destructive" onClick={() => setConfirmDeleteOpen(true)}>
                   <Trash2 className="mr-1 h-3 w-3" />
                   Excluir
                 </Button>
@@ -749,7 +808,7 @@ function AppointmentDialog({
 // ============================================================
 // Mini Calendar (sidebar)
 // ============================================================
-function MiniCalendar({ currentDate, onSelect }: { currentDate: Date; onSelect: (d: Date) => void }) {
+function MiniCalendar({ currentDate, onSelect, appointments }: { currentDate: Date; onSelect: (d: Date) => void; appointments: Appointment[] }) {
   const [viewMonth, setViewMonth] = useState(startOfMonth(currentDate))
 
   useEffect(() => {
@@ -762,6 +821,25 @@ function MiniCalendar({ currentDate, onSelect }: { currentDate: Date; onSelect: 
   })
 
   const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+
+  const dotsMap = useMemo(() => {
+    const map = new Map<string, "past" | "current" | "future">()
+    const now = new Date()
+    for (const a of appointments) {
+      const key = a.start_time.slice(0, 10)
+      const start = new Date(a.start_time)
+      const end = new Date(a.end_time)
+      let status: "past" | "current" | "future"
+      if (end < now) status = "past"
+      else if (start > now) status = "future"
+      else status = "current"
+      const existing = map.get(key)
+      if (!existing || status === "current" || (status === "future" && existing === "past")) {
+        map.set(key, status)
+      }
+    }
+    return map
+  }, [appointments])
 
   return (
     <div className="p-3">
@@ -790,11 +868,12 @@ function MiniCalendar({ currentDate, onSelect }: { currentDate: Date; onSelect: 
           const isSelected = isSameDay(day, currentDate)
           const isCurrentMonth = isSameMonth(day, viewMonth)
           const isCurrentDay = isToday(day)
+          const dot = isCurrentMonth ? dotsMap.get(format(day, "yyyy-MM-dd")) : undefined
           return (
             <button
               key={i}
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-full text-xs transition-colors",
+                "relative flex h-8 w-8 items-center justify-center rounded-full text-xs transition-colors",
                 isSelected
                   ? "bg-primary text-primary-foreground"
                   : isCurrentDay && isCurrentMonth
@@ -806,6 +885,14 @@ function MiniCalendar({ currentDate, onSelect }: { currentDate: Date; onSelect: 
               onClick={() => { onSelect(day); setViewMonth(startOfMonth(day)) }}
             >
               {format(day, "d")}
+              {dot && (
+                <span
+                  className={cn(
+                    "absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full",
+                    dot === "current" ? "bg-green-500" : dot === "future" ? "bg-blue-500" : "bg-muted-foreground/50",
+                  )}
+                />
+              )}
             </button>
           )
         })}
@@ -835,6 +922,10 @@ export function AgendaClient() {
   const [clickedDate, setClickedDate] = useState(toDateInput(new Date()))
   const [createdPatientId, setCreatedPatientId] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage("agenda:sidebarCollapsed", false)
+  const [calendarCollapsed, setCalendarCollapsed] = useLocalStorage("agenda:calendarCollapsed", false)
+  const [pastCollapsed, setPastCollapsed] = useLocalStorage("agenda:pastCollapsed", false)
+  const [currentCollapsed, setCurrentCollapsed] = useLocalStorage("agenda:currentCollapsed", false)
+  const [futureCollapsed, setFutureCollapsed] = useLocalStorage("agenda:futureCollapsed", false)
 
   const [userRole, setUserRole] = useState<string | null>(null)
   const [currentDentistId, setCurrentDentistId] = useState<string | null>(null)
@@ -924,6 +1015,12 @@ export function AgendaClient() {
         end: endOfWeek(date, { weekStartsOn: 0 }),
       }
     }
+    if (v === "threeDay") {
+      return {
+        start: subDays(date, 1),
+        end: addDays(date, 1),
+      }
+    }
     return { start: date, end: date }
   }, [])
 
@@ -973,6 +1070,15 @@ export function AgendaClient() {
 
   const handleSelectEvent = useCallback((event: CalendarEvent) => {
     const a = event.appointment
+    setEditAppointment(a)
+    setCreatedPatientId(null)
+    setReturnToId(null)
+    setClickedHour(new Date(a.start_time).getHours())
+    setClickedDate(toDateInput(new Date(a.start_time)))
+    setDialogOpen(true)
+  }, [])
+
+  const handleSidebarSelect = useCallback((a: Appointment) => {
     setEditAppointment(a)
     setCreatedPatientId(null)
     setReturnToId(null)
@@ -1066,18 +1172,20 @@ export function AgendaClient() {
   }, [])
 
   const handleViewChange = useCallback((newView: string) => {
-    setView(newView as ViewType)
+    setView(newView as any as ViewType)
   }, [])
 
   const goToday = () => setCurrentDate(new Date())
   const goPrev = () => {
     if (view === "month") setCurrentDate(subMonths(currentDate, 1))
     else if (view === "week") setCurrentDate(subDays(currentDate, 7))
+    else if (view === "threeDay") setCurrentDate(subDays(currentDate, 3))
     else setCurrentDate(subDays(currentDate, 1))
   }
   const goNext = () => {
     if (view === "month") setCurrentDate(addMonths(currentDate, 1))
     else if (view === "week") setCurrentDate(addDays(currentDate, 7))
+    else if (view === "threeDay") setCurrentDate(addDays(currentDate, 3))
     else setCurrentDate(addDays(currentDate, 1))
   }
 
@@ -1088,12 +1196,16 @@ export function AgendaClient() {
       const end = addDays(start, 6)
       return `${format(start, "dd/MM")} - ${format(end, "dd/MM")}`
     }
+    if (view === "threeDay") {
+      const start = subDays(currentDate, 1)
+      const end = addDays(currentDate, 1)
+      return `${format(start, "dd/MM")} - ${format(end, "dd/MM")}`
+    }
     return format(currentDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
   }, [currentDate, view])
 
   const handleDateSelect = (d: Date) => {
     setCurrentDate(d)
-    setView("day")
   }
 
   const dayAppointments = useMemo(() => {
@@ -1119,7 +1231,7 @@ export function AgendaClient() {
     <div className="flex gap-4">
       <div className="min-w-0 flex-1">
         <div className="mb-4 flex flex-wrap items-stretch justify-between gap-3">
-          <div className="inline-flex rounded-lg border bg-background p-0.5 shadow-sm">
+          <div className="inline-flex rounded-lg border bg-background p-0.5">
             {views.map((v) => {
               const Icon = v.icon
               const isActive = view === v.type
@@ -1129,7 +1241,7 @@ export function AgendaClient() {
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-all",
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-sm"
+                      ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                   onClick={() => setView(v.type)}
@@ -1208,8 +1320,9 @@ export function AgendaClient() {
           <>
             <DnDCalendar
               localizer={localizer}
+              culture="pt-BR"
               events={events}
-              view={view as "day" | "week" | "month" | "agenda"}
+              view={view as any}
               date={currentDate}
               onNavigate={handleNavigate}
               onView={handleViewChange}
@@ -1223,9 +1336,9 @@ export function AgendaClient() {
               onEventDrop={handleEventDrop}
               onEventResize={handleEventResize}
               eventPropGetter={eventPropGetter}
-              views={["month", "week", "day", "agenda"]}
+              views={{ month: true, week: true, day: true, agenda: true, threeDay: ThreeDayView } as any}
               step={15}
-              timeslots={4}
+              timeslots={2}
               scrollToTime={new Date(0, 0, 0, 8, 0, 0)}
               className="rounded-xl border bg-card"
               style={{ height: 900 }}
@@ -1253,16 +1366,59 @@ export function AgendaClient() {
                 agendaTimeFormat: "HH:mm",
                 eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
                   `${format(start, "HH:mm")} - ${format(end, "HH:mm")}`,
+                weekdayFormat: (date: Date) => format(date, "cccc", { locale: ptBR }).toUpperCase(),
+                dayFormat: (date: Date) => `${format(date, "dd")} ${format(date, "cccc", { locale: ptBR }).toUpperCase()}`,
               }}
               components={{
-                event: ({ event }) => (
-                  <div className="truncate px-0.5 text-[11px] leading-tight">
-                    <span className="font-medium">{event.appointment.patients?.name}</span>
-                    <span className="ml-1 text-muted-foreground">
-                      {format(new Date(event.start), "HH:mm")}
-                    </span>
-                  </div>
-                ),
+                event: ({ event }) => {
+                  const a = event.appointment
+                  const statusLabel = STATUS_LABELS[a.status] ?? a.status
+                  const statusColorMap: Record<string, string> = {
+                    scheduled: "bg-amber-100 text-amber-800",
+                    confirmed: "bg-blue-100 text-blue-800",
+                    in_progress: "bg-orange-100 text-orange-800",
+                    completed: "bg-green-100 text-green-800",
+                    cancelled: "bg-red-100 text-red-800",
+                  }
+                  return (
+                    <EventTooltip
+                      content={
+                        <div className="space-y-2 text-sm">
+                          <p className="font-semibold leading-tight">{a.patients?.name ?? "Sem nome"}</p>
+                          <div className="space-y-0.5 text-xs text-muted-foreground">
+                            {a.procedures?.name && (
+                              <p className="flex items-center gap-1.5">
+                                {a.procedures.color && (
+                                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: a.procedures.color }} />
+                                )}
+                                {a.procedures.name}
+                              </p>
+                            )}
+                            {a.dentists?.name && <p>{a.dentists.name}</p>}
+                            <p>{format(new Date(a.start_time), "HH:mm")} - {format(new Date(a.end_time), "HH:mm")}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center rounded-md border border-transparent px-1.5 py-0.5 text-[10px] font-medium ${statusColorMap[a.status] ?? "bg-muted text-muted-foreground"}`}>
+                              {statusLabel}
+                            </span>
+                          </div>
+                          {a.notes && (
+                            <p className="text-xs text-muted-foreground border-t pt-1.5 leading-relaxed line-clamp-2">
+                              {a.notes}
+                            </p>
+                          )}
+                        </div>
+                      }
+                    >
+                      <div className="truncate px-0.5 text-[11px] leading-tight">
+                        <span className="font-medium">{event.appointment.patients?.name}</span>
+                        <span className="ml-1 text-muted-foreground">
+                          {format(new Date(event.start), "HH:mm")}
+                        </span>
+                      </div>
+                    </EventTooltip>
+                  )
+                },
                 showMore: ({ count }) => (
                   <div className="cursor-pointer px-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors">
                     +{count} mais
@@ -1297,8 +1453,8 @@ export function AgendaClient() {
             setTimeout(() => setDialogOpen(true), 0)
           }}
           createdPatientId={createdPatientId}
-          onPatientCreated={({ id, name }) => {
-            setPatients((prev) => [...prev, { id, name, cpf: null, phone: null, birth_date: null, notes: null, active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() } as Patient])
+          onPatientCreated={({ id, name, email }) => {
+            setPatients((prev) => [...prev, { id, name, cpf: null, phone: null, email, birth_date: null, notes: null, active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() } as Patient])
             setCreatedPatientId(id)
           }}
           returnToId={returnToId}
@@ -1322,15 +1478,15 @@ export function AgendaClient() {
         />
       </div>
 
-      <aside className={cn("hidden shrink-0 transition-all duration-300 md:block", sidebarCollapsed ? "w-12" : "w-80")}>
+      <aside className={cn("hidden shrink-0 transition-all duration-300 md:block", sidebarCollapsed ? "w-12" : "w-75")}>
         {sidebarCollapsed ? (
           <div className="flex flex-col items-center gap-4 rounded-xl border bg-card py-3">
             <button
               className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
-              onClick={() => setSidebarCollapsed(false)}
-              title="Expandir sidebar"
-            >
-              <PanelLeftOpen className="h-4 w-4" />
+               onClick={() => setSidebarCollapsed(false)}
+               title="Expandir sidebar"
+             >
+               <PanelLeftClose className="h-4 w-4" />
             </button>
             <div className="h-px w-6 bg-border" />
             <button
@@ -1350,65 +1506,119 @@ export function AgendaClient() {
           </div>
         ) : (
             <div className="divide-y rounded-xl border bg-card">
-            <div className="flex items-center justify-end p-2">
+            <div className="flex items-center justify-between p-2">
+              <button
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+                onClick={() => setCalendarCollapsed(!calendarCollapsed)}
+                title={calendarCollapsed ? "Mostrar calendário" : "Ocultar calendário"}
+              >
+                {calendarCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              </button>
               <button
                 className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
                 onClick={() => setSidebarCollapsed(true)}
                 title="Retrair sidebar"
               >
-                <PanelLeftClose className="h-4 w-4" />
+                <PanelLeftOpen className="h-4 w-4" />
               </button>
             </div>
-            <MiniCalendar currentDate={currentDate} onSelect={handleDateSelect} />
+            <div className={cn("overflow-hidden transition-all duration-300", calendarCollapsed ? "max-h-0" : "max-h-[400px]")}>
+              <MiniCalendar currentDate={currentDate} onSelect={handleDateSelect} appointments={appointments} />
+            </div>
             <div className="divide-y p-4">
               {dayAppointments.past.length > 0 && (
                 <div className="pb-3">
-                  <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Passados</p>
-                  {dayAppointments.past.map((a) => (
-                    <div key={a.id} className="py-1.5">
-                      <p className="text-sm font-medium">{a.patients?.name}</p>
-                      <p className="text-xs text-muted-foreground">{a.dentists?.name}</p>
-                      <p className="text-xs text-muted-foreground">{format(new Date(a.start_time), "HH:mm")} - {format(new Date(a.end_time), "HH:mm")}</p>
-                    </div>
-                  ))}
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Passados</p>
+                    <button
+                      className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent"
+                      onClick={() => setPastCollapsed(!pastCollapsed)}
+                      title={pastCollapsed ? "Mostrar" : "Ocultar"}
+                    >
+                      {pastCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                  <div className={cn("overflow-hidden transition-all duration-300", pastCollapsed ? "max-h-0" : "max-h-[2000px]")}>
+                    {dayAppointments.past.map((a) => (
+                      <div
+                        key={a.id}
+                        className="cursor-pointer py-1.5 hover:bg-accent rounded-md px-1 transition-colors"
+                        onClick={() => handleSidebarSelect(a)}
+                      >
+                        <p className="text-sm font-medium">{a.patients?.name}</p>
+                        <p className="text-xs text-muted-foreground">{a.dentists?.name}</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(a.start_time), "HH:mm")} - {format(new Date(a.end_time), "HH:mm")}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               <div className={cn(dayAppointments.past.length > 0 && "pt-3", dayAppointments.future.length > 0 && "pb-3")}>
-                <div className="flex items-center gap-2 mb-2">
-                  {dayAppointments.current.length > 0 ? (
-                    <>
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
-                      </span>
-                      <p className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">Acontecendo Agora</p>
-                    </>
-                  ) : (
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Atual</p>
-                  )}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {dayAppointments.current.length > 0 ? (
+                      <>
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+                        </span>
+                        <p className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">Acontecendo Agora</p>
+                      </>
+                    ) : (
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Atual</p>
+                    )}
+                  </div>
+                  <button
+                    className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent"
+                    onClick={() => setCurrentCollapsed(!currentCollapsed)}
+                    title={currentCollapsed ? "Mostrar" : "Ocultar"}
+                  >
+                    {currentCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                  </button>
                 </div>
                 {dayAppointments.current.length === 0 ? (
                   <p className="text-xs text-muted-foreground py-4">Nenhum evento no momento</p>
                 ) : (
-                  dayAppointments.current.map((a) => (
-                    <div key={a.id} className="py-1.5">
-                      <p className="text-sm font-medium">{a.patients?.name}</p>
-                      <p className="text-xs text-muted-foreground">{a.dentists?.name}</p>
-                      <p className="text-xs text-muted-foreground">{format(new Date(a.start_time), "HH:mm")} - {format(new Date(a.end_time), "HH:mm")}</p>
-                    </div>
-                  ))
+                  <div className={cn("overflow-hidden transition-all duration-300", currentCollapsed ? "max-h-0" : "max-h-[2000px]")}>
+                    {dayAppointments.current.map((a) => (
+                      <div
+                        key={a.id}
+                        className="cursor-pointer py-1.5 hover:bg-accent rounded-md px-1 transition-colors"
+                        onClick={() => handleSidebarSelect(a)}
+                      >
+                        <p className="text-sm font-medium">{a.patients?.name}</p>
+                        <p className="text-xs text-muted-foreground">{a.dentists?.name}</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(a.start_time), "HH:mm")} - {format(new Date(a.end_time), "HH:mm")}</p>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
               {dayAppointments.future.length > 0 && (
                 <div className="pt-3">
-                  <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Futuros</p>
-                  {dayAppointments.future.map((a) => (
-                    <div key={a.id} className="py-1.5">
-                      <p className="text-sm font-medium">{a.patients?.name}</p>
-                      <p className="text-xs text-muted-foreground">{a.dentists?.name}</p>
-                      <p className="text-xs text-muted-foreground">{format(new Date(a.start_time), "HH:mm")} - {format(new Date(a.end_time), "HH:mm")}</p>
-                    </div>
-                  ))}
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Futuros</p>
+                    <button
+                      className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent"
+                      onClick={() => setFutureCollapsed(!futureCollapsed)}
+                      title={futureCollapsed ? "Mostrar" : "Ocultar"}
+                    >
+                      {futureCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                  <div className={cn("overflow-hidden transition-all duration-300", futureCollapsed ? "max-h-0" : "max-h-[2000px]")}>
+                    {dayAppointments.future.map((a) => (
+                      <div
+                        key={a.id}
+                        className="cursor-pointer py-1.5 hover:bg-accent rounded-md px-1 transition-colors"
+                        onClick={() => handleSidebarSelect(a)}
+                      >
+                        <p className="text-sm font-medium">{a.patients?.name}</p>
+                        <p className="text-xs text-muted-foreground">{a.dentists?.name}</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(a.start_time), "HH:mm")} - {format(new Date(a.end_time), "HH:mm")}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               {dayAppointments.past.length === 0 && dayAppointments.current.length === 0 && dayAppointments.future.length === 0 && (
