@@ -60,7 +60,7 @@ export function RichTextEditor({
   return (
     <div
       className={cn(
-        "rounded-md border border-input bg-background shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring",
+        "rounded-md border border-input bg-background transition-colors focus-within:ring-1 focus-within:ring-ring",
         className,
       )}
       style={{ minHeight }}

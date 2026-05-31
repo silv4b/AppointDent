@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { DataTablePagination } from "@/components/data-table-pagination"
 import {
   Table,
   TableBody,
@@ -31,6 +32,8 @@ export function MinhasAnamnesesClient() {
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   useEffect(() => {
     const supabase = createClient()
@@ -42,7 +45,7 @@ export function MinhasAnamnesesClient() {
           return
         }
         getMyAnamnesisTemplates().then((res) => {
-          if ("data" in res) setTemplates(res.data as Template[])
+if ("data" in res) setTemplates(res.data as unknown as Template[])
           setLoading(false)
         })
       })
@@ -61,7 +64,7 @@ export function MinhasAnamnesesClient() {
       toast.success("Modelo excluído")
       setDeleteId(null)
       const res = await getMyAnamnesisTemplates()
-      if ("data" in res) setTemplates(res.data as Template[])
+      if ("data" in res) setTemplates(res.data as unknown as Template[])
     }
     setDeleting(false)
   }
@@ -107,7 +110,7 @@ export function MinhasAnamnesesClient() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {templates.map((t) => (
+              {templates.slice((page - 1) * pageSize, page * pageSize).map((t) => (
                 <TableRow key={t.id}>
                   <TableCell className="font-medium">{t.name}</TableCell>
                   <TableCell className="text-muted-foreground text-xs max-w-sm truncate">
@@ -131,6 +134,7 @@ export function MinhasAnamnesesClient() {
               ))}
             </TableBody>
           </Table>
+          <DataTablePagination page={page} pageSize={pageSize} total={templates.length} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
         </div>
       )}
 

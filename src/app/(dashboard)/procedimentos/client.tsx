@@ -654,9 +654,9 @@ export function ProceduresClient() {
                         {reqSortColumn === "created_at" ? (reqSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
                       </div>
                     </TableHead>
-                    <TableHead className="w-16">Status</TableHead>
+                    <TableHead className="w-16">Situação</TableHead>
                     <TableHead>Revisado em</TableHead>
-                    <TableHead className="w-16 text-right">Info</TableHead>
+                    <TableHead className="w-16 text-right">Detalhes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -767,7 +767,7 @@ export function ProceduresClient() {
                 <h4 className="mb-2 text-sm font-medium text-muted-foreground">Revisão</h4>
                 <div className="rounded-lg border bg-muted/50 p-3 text-sm space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">Status</span>
+                    <span className="text-muted-foreground">Situação</span>
                     <div
                       className={`h-3 w-3 rounded-full ${detailRequest.status === "approved" ? "bg-green-500" : "bg-red-500"}`}
                     />

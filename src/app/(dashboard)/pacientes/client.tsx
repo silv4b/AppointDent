@@ -39,7 +39,7 @@ export function PatientsClient() {
   const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
   const [search, setSearch] = useState("")
-  const [sortColumn, setSortColumn] = useState<"name" | "cpf" | "birth_date" | "active">("name")
+  const [sortColumn, setSortColumn] = useState<"name" | "cpf" | "email" | "birth_date" | "active">("name")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -53,7 +53,7 @@ export function PatientsClient() {
       .select("*", { count: "exact" })
       .order("name")
     if (searchTerm) {
-      query = query.or(`name.ilike.%${searchTerm}%,cpf.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`)
+      query = query.or(`name.ilike.%${searchTerm}%,cpf.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
     }
     const { data, count } = await query
       .range((pageNum - 1) * pageSizeNum, pageNum * pageSizeNum - 1)
@@ -152,6 +152,12 @@ export function PatientsClient() {
                 </div>
               </TableHead>
               <TableHead>Telefone</TableHead>
+              <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("email")}>
+                <div className="flex items-center gap-1">
+                  Email
+                  {sortColumn === "email" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                </div>
+              </TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("birth_date")}>
                 <div className="flex items-center gap-1">
                   Nascimento
@@ -186,6 +192,7 @@ export function PatientsClient() {
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell className="text-muted-foreground">{p.cpf ?? "-"}</TableCell>
                   <TableCell className="text-muted-foreground">{p.phone ?? "-"}</TableCell>
+                  <TableCell className="text-muted-foreground">{p.email ?? "-"}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {p.birth_date
                       ? format(new Date(p.birth_date), "dd/MM/yyyy", { locale: ptBR })
@@ -233,9 +240,10 @@ export function PatientsClient() {
           { name: "name", label: "Nome", required: true, defaultValue: edit?.name ?? "" },
           { name: "cpf", label: "CPF", placeholder: "000.000.000-00", defaultValue: edit?.cpf ?? "" },
           { name: "phone", label: "Telefone", type: "tel" as const, placeholder: "(00) 00000-0000", defaultValue: edit?.phone ?? "" },
+          { name: "email", label: "Email", type: "email" as const, placeholder: "paciente@exemplo.com", defaultValue: edit?.email ?? "" },
           { name: "birth_date", label: "Data de Nascimento", type: "date" as const, defaultValue: edit?.birth_date ?? "" },
           { name: "notes", label: "Observações", defaultValue: edit?.notes ?? "" },
-          { name: "active", label: "Ativo", type: "checkbox" as const, defaultValue: edit?.active ? "on" : "off" },
+          { name: "active", label: "Ativo", type: "checkbox" as const, defaultValue: !edit || edit.active ? "on" : "off" },
         ]}
         action={edit ? updatePatient : createPatient}
         successMessage={edit ? "Paciente atualizado" : "Paciente cadastrado"}

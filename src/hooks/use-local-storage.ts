@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 
-export function useLocalStorage<T>(key: string, initial: T): [T, (value: T) => void] {
+export function useLocalStorage<T>(key: string, initial: T): [T, (value: T | ((prev: T) => T)) => void] {
   const [value, setValue] = useState<T>(initial)
 
   useEffect(() => {
@@ -24,8 +24,8 @@ export function useLocalStorage<T>(key: string, initial: T): [T, (value: T) => v
     }
   }, [key, value])
 
-  const set = useCallback((next: T) => {
-    setValue(next)
+  const set = useCallback((next: T | ((prev: T) => T)) => {
+    setValue((current) => typeof next === "function" ? (next as (prev: T) => T)(current) : next)
   }, [])
 
   return [value, set]

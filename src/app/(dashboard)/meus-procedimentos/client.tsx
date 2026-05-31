@@ -4,7 +4,6 @@ import { DataTablePagination } from "@/components/data-table-pagination"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -46,10 +45,10 @@ const STATUS_ICON: Record<string, typeof Clock> = {
   rejected: XCircle,
 }
 
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = {
-  pending: "default",
-  approved: "secondary",
-  rejected: "destructive",
+const STATUS_COLOR: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-800",
+  approved: "bg-green-100 text-green-800",
+  rejected: "bg-red-100 text-red-800",
 }
 
 export function MeusProcedimentosClient() {
@@ -423,7 +422,7 @@ export function MeusProcedimentosClient() {
               </TableHead>
               <TableHead className="w-24">Duração</TableHead>
               <TableHead className="w-24">Valor</TableHead>
-              <TableHead className="w-28">Status</TableHead>
+              <TableHead className="w-28">Situação</TableHead>
               <TableHead className="w-32">Data</TableHead>
             </TableRow>
           </TableHeader>
@@ -448,10 +447,10 @@ export function MeusProcedimentosClient() {
                         : "—"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={STATUS_VARIANT[r.status]}>
-                        <StatusIcon className="h-12 mr-1 w-3 inline" />
+                      <span className={`inline-flex items-center gap-1 rounded-md border border-transparent px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[r.status] ?? "bg-muted text-muted-foreground"}`}>
+                        <StatusIcon className="h-3 w-3" />
                         {STATUS_LABEL[r.status]}
-                      </Badge>
+                      </span>
                     </TableCell>
                     <TableCell className="h-12 text-muted-foreground text-sm">
                       {new Date(r.created_at).toLocaleDateString("pt-BR")}

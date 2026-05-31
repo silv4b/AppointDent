@@ -245,7 +245,7 @@ export function HorariosClient() {
           {grouped.map(({ dentist, slots: dentistSlots }) => {
             const isExpanded = expanded[dentist.id] ?? true
             return (
-              <div key={dentist.id} className={`rounded-2xl border bg-card transition-shadow ${isExpanded ? "shadow-md" : "shadow-sm"}`}>
+              <div key={dentist.id} className={`rounded-2xl border bg-card transition-shadow`}>
                 <div
                   role="button"
                   tabIndex={0}

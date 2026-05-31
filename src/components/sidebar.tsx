@@ -107,6 +107,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
       label: "Clínico",
       items: [
         { href: "/anamnese", label: "Anamnese", icon: BookOpen as typeof LayoutDashboard },
+        { href: "/historico", label: "Histórico de Agendamentos", icon: Clock as typeof LayoutDashboard },
         ...(isDentist ? [
           { href: "/minhas-anamneses", label: "Minhas Anamneses", icon: FileText as typeof LayoutDashboard },
           { href: "/meus-procedimentos", label: "Meus Procedimentos", icon: Syringe as typeof LayoutDashboard },
@@ -156,7 +157,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
 
   const sidebarContent = (
     <>
-      <div className="flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border px-4">
+      <Link href="/" className="flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border px-4 no-underline">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary">
           <Image src="/assets/tooth-icon.png" alt="Ícone" width={24} height={24} />
         </div>
@@ -166,7 +167,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
         )}>
           AppointDent
         </span>
-      </div>
+      </Link>
 
       <nav className="flex-1 space-y-3 overflow-y-auto px-2 py-4">
         {role === null ? (
@@ -257,7 +258,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
     <>
       <button
         type="button"
-        className="fixed left-4 top-3 z-50 flex size-9 items-center justify-center rounded-lg bg-sidebar text-sidebar-foreground shadow-lg transition-colors hover:bg-sidebar-accent lg:hidden"
+        className="fixed left-4 top-3 z-50 flex size-9 items-center justify-center rounded-lg bg-sidebar text-sidebar-foreground transition-colors hover:bg-sidebar-accent lg:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="Abrir menu"
       >
@@ -274,7 +275,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
       <aside
         className={cn(
           "fixed left-0 top-0 z-50 flex h-full flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300",
-          collapsed ? "w-16" : "w-[230px]",
+          collapsed ? "w-16" : "w-62",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >

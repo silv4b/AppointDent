@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -22,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { approveProcedureRequest, getPendingProcedureRequests, rejectProcedureRequest } from "@/lib/actions/procedure-requests"
+import { DataTablePagination } from "@/components/data-table-pagination"
 import { Loader2, CheckCircle, XCircle, Search, RefreshCw } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -52,10 +52,13 @@ export function SolicitacoesClient() {
   const [rejectId, setRejectId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
   const [refreshing, setRefreshing] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetch = useCallback(async () => {
     setLoading(true)
+    setPage(1)
     const data = await getPendingProcedureRequests()
     setRequests(data as PendingRequest[])
     setLoading(false)
@@ -63,6 +66,7 @@ export function SolicitacoesClient() {
 
   const refresh = async () => {
     setRefreshing(true)
+    setPage(1)
     const data = await getPendingProcedureRequests()
     setRequests(data as PendingRequest[])
     setRefreshing(false)
@@ -127,7 +131,7 @@ export function SolicitacoesClient() {
       (r.dentist?.name ?? "").toLowerCase().includes(q) ||
       (r.description ?? "").toLowerCase().includes(q)
     )
-  })
+  }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return (
     <div>
@@ -151,7 +155,7 @@ export function SolicitacoesClient() {
             <Input
               ref={searchRef}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
               placeholder="Buscar solicitações..."
               className="h-9 pl-9"
             />
@@ -183,7 +187,7 @@ export function SolicitacoesClient() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((r) => (
+              filtered.slice((page - 1) * pageSize, page * pageSize).map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.name}</TableCell>
                   <TableCell className="text-muted-foreground max-w-xs truncate">
@@ -223,8 +227,9 @@ export function SolicitacoesClient() {
               ))
             )}
           </TableBody>
-        </Table>
-      </div>
+          </Table>
+          <DataTablePagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
+        </div>
 
       <Dialog open={approveConfirmId !== null} onOpenChange={() => setApproveConfirmId(null)}>
         <DialogContent>

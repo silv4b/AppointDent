@@ -129,11 +129,11 @@ export function DashboardClient() {
   }
 
   const statusVariant: Record<string, string> = {
-    scheduled: "bg-primary/10 text-primary",
-    confirmed: "bg-chart-2/10 text-chart-2",
-    in_progress: "bg-warning/10 text-warning-foreground",
-    completed: "bg-success/10 text-success-foreground",
-    cancelled: "bg-destructive/10 text-destructive",
+    scheduled: "bg-amber-100 text-amber-800",
+    confirmed: "bg-blue-100 text-blue-800",
+    in_progress: "bg-orange-100 text-orange-800",
+    completed: "bg-green-100 text-green-800",
+    cancelled: "bg-red-100 text-red-800",
   }
 
   return (
@@ -165,7 +165,7 @@ export function DashboardClient() {
           return (
             <div
               key={stat.label}
-              className="group rounded-2xl border bg-card text-card-foreground shadow-md transition-all duration-300 hover:shadow-lg hover:border-primary/20"
+              className="group rounded-2xl border bg-card text-card-foreground transition-all duration-300 hover:border-primary/20"
             >
               <div className="p-6">
                 <div className="flex items-start justify-between">
@@ -177,7 +177,7 @@ export function DashboardClient() {
                       {stat.value}
                     </span>
                   </div>
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110 shadow-sm ${bgMap[stat.chartColor]}`}>
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110 ${bgMap[stat.chartColor]}`}>
                     <Icon className={`h-6 w-6 ${textMap[stat.chartColor]}`} />
                   </div>
                 </div>
@@ -192,9 +192,9 @@ export function DashboardClient() {
           const Icon = link.icon
           return (
             <Link key={link.href} href={link.href}>
-              <div className="group cursor-pointer rounded-2xl border bg-card text-card-foreground shadow-md transition-all duration-300 hover:shadow-lg hover:border-primary/20">
+              <div className="group cursor-pointer rounded-2xl border bg-card text-card-foreground transition-all duration-300 hover:border-primary/20">
                 <div className="flex items-center gap-4 p-6">
-                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110 shadow-sm ${link.color}`}>
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110 ${link.color}`}>
                     <Icon className="h-6 w-6" />
                   </div>
                   <span className="text-base font-medium">{link.label}</span>
@@ -206,7 +206,7 @@ export function DashboardClient() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-        <div className="rounded-2xl border bg-card text-card-foreground shadow-md col-span-full xl:col-span-8">
+        <div className="rounded-2xl border bg-card text-card-foreground col-span-full xl:col-span-8">
           <div className="flex items-center justify-between p-6 pb-3">
             <h3 className="text-base font-semibold tracking-tight">
               Agendamentos de Hoje
@@ -235,7 +235,7 @@ export function DashboardClient() {
                     Horário
                   </th>
                   <th className="pb-3 pr-6 text-end text-xs font-medium text-muted-foreground">
-                    Status
+                    Situação
                   </th>
                 </tr>
               </thead>
@@ -286,7 +286,7 @@ export function DashboardClient() {
                       </td>
                       <td className="py-4 pr-6 text-end">
                         <span
-                          className={`inline-flex items-center rounded-md border border-transparent px-2 py-0.5 text-[11px] font-medium capitalize shadow-sm ${statusVariant[a.status] ?? "bg-muted text-muted-foreground"}`}
+                          className={`inline-flex items-center justify-center rounded-md border border-transparent px-2 py-0.5 text-[11px] font-medium capitalize min-w-[7.5rem] ${statusVariant[a.status] ?? "bg-muted text-muted-foreground"}`}
                         >
                           {statusLabel[a.status] ?? a.status}
                         </span>
@@ -299,7 +299,7 @@ export function DashboardClient() {
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-card text-card-foreground shadow-md col-span-full xl:col-span-4">
+        <div className="rounded-2xl border bg-card text-card-foreground col-span-full xl:col-span-4">
           <div className="p-6 pb-3">
             <h3 className="text-base font-semibold tracking-tight">
               Acesso Rápido
