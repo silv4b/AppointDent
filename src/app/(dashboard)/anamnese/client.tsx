@@ -37,6 +37,8 @@ export function AnamneseSearchClient() {
   const [total, setTotal] = useState(0)
   const [sortColumn, setSortColumn] = useState<"name" | "birth_date">("name")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [receptionistDentistIds, setReceptionistDentistIds] = useState<string[]>([])
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetch = useCallback(
@@ -55,6 +57,14 @@ export function AnamneseSearchClient() {
           .select("patient_id")
           .eq("dentist_id", dentistFilter)
         patientIds = [...new Set((appts ?? []).map((a) => a.patient_id))]
+      } else if (userRole === "receptionist" && receptionistDentistIds.length > 0) {
+        const { data: appts } = await supabase
+          .from("appointments")
+          .select("patient_id")
+          .in("dentist_id", receptionistDentistIds)
+        patientIds = [...new Set((appts ?? []).map((a) => a.patient_id))]
+      } else if (userRole === "receptionist") {
+        patientIds = []
       }
 
       let queryBuilder = supabase
@@ -85,7 +95,7 @@ export function AnamneseSearchClient() {
       if (count !== null) setTotal(count)
       setLoading(false)
     },
-    [page, pageSize, query, dentistId],
+    [page, pageSize, query, dentistId, userRole, receptionistDentistIds],
   )
 
   useEffect(() => {
@@ -95,6 +105,18 @@ export function AnamneseSearchClient() {
       .select("*")
       .order("name")
       .then((res) => setDentists(res.data ?? []))
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data: profile }) => {
+        if (!profile) return
+        setUserRole(profile.role)
+        if (profile.role === "receptionist") {
+          supabase.from("receptionist_dentists").select("dentist_id").eq("receptionist_id", user.id).then(({ data }) => {
+            setReceptionistDentistIds(data?.map((r) => r.dentist_id) ?? [])
+          })
+        }
+      })
+    })
   }, [])
 
   useEffect(() => {
@@ -181,7 +203,10 @@ export function AnamneseSearchClient() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os dentistas</SelectItem>
-              {dentists.map((d) => (
+              {(userRole === "receptionist" && receptionistDentistIds.length > 0
+                ? dentists.filter((d) => receptionistDentistIds.includes(d.id))
+                : dentists
+              ).map((d) => (
                 <SelectItem key={d.id} value={d.id}>
                   {d.name}
                 </SelectItem>

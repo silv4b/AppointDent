@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { EventTooltip } from "@/components/event-tooltip"
+import { MiniCalendar } from "@/components/mini-calendar"
 import {
   Dialog,
   DialogContent,
@@ -127,6 +128,7 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "outline" | "des
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  pending: "Pendente",
   scheduled: "Agendado",
   confirmed: "Confirmado",
   in_progress: "Em Andamento",
@@ -806,102 +808,6 @@ function AppointmentDialog({
 }
 
 // ============================================================
-// Mini Calendar (sidebar)
-// ============================================================
-function MiniCalendar({ currentDate, onSelect, appointments }: { currentDate: Date; onSelect: (d: Date) => void; appointments: Appointment[] }) {
-  const [viewMonth, setViewMonth] = useState(startOfMonth(currentDate))
-
-  useEffect(() => {
-    setViewMonth(startOfMonth(currentDate))
-  }, [currentDate])
-
-  const days = eachDayOfInterval({
-    start: startOfWeek(viewMonth),
-    end: endOfWeek(endOfMonth(viewMonth)),
-  })
-
-  const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
-
-  const dotsMap = useMemo(() => {
-    const map = new Map<string, "past" | "current" | "future">()
-    const now = new Date()
-    for (const a of appointments) {
-      const key = a.start_time.slice(0, 10)
-      const start = new Date(a.start_time)
-      const end = new Date(a.end_time)
-      let status: "past" | "current" | "future"
-      if (end < now) status = "past"
-      else if (start > now) status = "future"
-      else status = "current"
-      const existing = map.get(key)
-      if (!existing || status === "current" || (status === "future" && existing === "past")) {
-        map.set(key, status)
-      }
-    }
-    return map
-  }, [appointments])
-
-  return (
-    <div className="p-3">
-      <div className="flex items-center justify-between mb-3">
-        <button
-          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
-          onClick={() => setViewMonth(subMonths(viewMonth, 1))}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <span className="text-sm font-medium">{format(viewMonth, "MMMM yyyy", { locale: ptBR })}</span>
-        <button
-          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
-          onClick={() => setViewMonth(addMonths(viewMonth, 1))}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-      <div className="grid grid-cols-7 gap-0 text-center">
-        {dayNames.map((name) => (
-          <div key={name} className="py-1 text-[11px] font-medium text-muted-foreground">
-            {name}
-          </div>
-        ))}
-        {days.map((day, i) => {
-          const isSelected = isSameDay(day, currentDate)
-          const isCurrentMonth = isSameMonth(day, viewMonth)
-          const isCurrentDay = isToday(day)
-          const dot = isCurrentMonth ? dotsMap.get(format(day, "yyyy-MM-dd")) : undefined
-          return (
-            <button
-              key={i}
-              className={cn(
-                "relative flex h-8 w-8 items-center justify-center rounded-full text-xs transition-colors",
-                isSelected
-                  ? "bg-primary text-primary-foreground"
-                  : isCurrentDay && isCurrentMonth
-                    ? "border border-primary text-primary"
-                    : isCurrentMonth
-                      ? "text-foreground hover:bg-accent"
-                      : "text-muted-foreground/30",
-              )}
-              onClick={() => { onSelect(day); setViewMonth(startOfMonth(day)) }}
-            >
-              {format(day, "d")}
-              {dot && (
-                <span
-                  className={cn(
-                    "absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full",
-                    dot === "current" ? "bg-green-500" : dot === "future" ? "bg-blue-500" : "bg-muted-foreground/50",
-                  )}
-                />
-              )}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ============================================================
 // Main Agenda Client
 // ============================================================
 export function AgendaClient() {
@@ -929,6 +835,7 @@ export function AgendaClient() {
 
   const [userRole, setUserRole] = useState<string | null>(null)
   const [currentDentistId, setCurrentDentistId] = useState<string | null>(null)
+  const [receptionistDentistIds, setReceptionistDentistIds] = useState<string[]>([])
   const [isReady, setIsReady] = useState(false)
   const [dentistProcedureMap, setDentistProcedureMap] = useState<Record<string, string[]>>({})
 
@@ -950,6 +857,12 @@ export function AgendaClient() {
             setCurrentDentistId(dentist.id)
             setSelectedDentist(dentist.id)
           }
+        } else if (role === "receptionist") {
+          const { data: links } = await supabase
+            .from("receptionist_dentists")
+            .select("dentist_id")
+            .eq("receptionist_id", user.id)
+          setReceptionistDentistIds(links?.map((r) => r.dentist_id) ?? [])
         }
 
         setIsReady(true)
@@ -967,9 +880,16 @@ export function AgendaClient() {
       .select("*, patients(name), dentists(name), procedures(name, color, duration_minutes)")
       .gte("start_time", `${startStr}T00:00:00Z`)
       .lte("start_time", `${endStr}T23:59:59Z`)
+      .neq("status", "cancelled")
 
     if (userRole === "dentist" && currentDentistId) {
       query = query.eq("dentist_id", currentDentistId)
+    } else if (userRole === "receptionist") {
+      if (receptionistDentistIds.length > 0) {
+        query = query.in("dentist_id", receptionistDentistIds)
+      } else {
+        query = query.eq("dentist_id", "00000000-0000-0000-0000-000000000000")
+      }
     }
 
     const [appointmentsData, dentistsData, patientsData, proceduresData, dentistProcsData, approvedReqsData] = await Promise.all([
@@ -1000,7 +920,7 @@ export function AgendaClient() {
     }
     setDentistProcedureMap(dpMap)
     setLoading(false)
-  }, [userRole, currentDentistId])
+  }, [userRole, currentDentistId, receptionistDentistIds])
 
   const getVisibleRange = useCallback((date: Date, v: string) => {
     if (v === "month") {
@@ -1289,7 +1209,10 @@ export function AgendaClient() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os dentistas</SelectItem>
-                {dentists.map((d) => (
+                {(userRole === "receptionist" && receptionistDentistIds.length > 0
+                  ? dentists.filter((d) => receptionistDentistIds.includes(d.id))
+                  : dentists
+                ).map((d) => (
                   <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -1328,7 +1251,6 @@ export function AgendaClient() {
               onView={handleViewChange}
               selectable
               resizable
-              showAllEvents
               draggableAccessor={() => true}
               resizableAccessor={() => true}
               onSelectSlot={handleSelectSlot}
@@ -1354,7 +1276,6 @@ export function AgendaClient() {
                 time: "Hora",
                 event: "Evento",
                 noEventsInRange: "Nenhum agendamento neste período.",
-                showMore: (total) => `+${total} mais`,
               }}
               formats={{
                 monthHeaderFormat: "MMMM 'de' yyyy",
@@ -1374,6 +1295,7 @@ export function AgendaClient() {
                   const a = event.appointment
                   const statusLabel = STATUS_LABELS[a.status] ?? a.status
                   const statusColorMap: Record<string, string> = {
+                    pending: "bg-purple-100 text-purple-800",
                     scheduled: "bg-amber-100 text-amber-800",
                     confirmed: "bg-blue-100 text-blue-800",
                     in_progress: "bg-orange-100 text-orange-800",
@@ -1438,7 +1360,9 @@ export function AgendaClient() {
           appointment={editAppointment}
           defaultDate={clickedDate}
           defaultHour={clickedHour}
-          dentists={dentists}
+          dentists={userRole === "receptionist" && receptionistDentistIds.length > 0
+            ? dentists.filter((d) => receptionistDentistIds.includes(d.id))
+            : dentists}
           patients={patients}
           procedures={procedures}
           dentistProcedureMap={dentistProcedureMap}
@@ -1466,7 +1390,9 @@ export function AgendaClient() {
           open={returnDialogOpen}
           onOpenChange={setReturnDialogOpen}
           patients={patients}
-          dentists={dentists}
+          dentists={userRole === "receptionist" && receptionistDentistIds.length > 0
+            ? dentists.filter((d) => receptionistDentistIds.includes(d.id))
+            : dentists}
           onSelect={(appt) => {
             setEditAppointment(null)
             setCreatedPatientId(null)
@@ -1529,7 +1455,7 @@ export function AgendaClient() {
               {dayAppointments.past.length > 0 && (
                 <div className="pb-3">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Passados</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Passados ({dayAppointments.past.length})</p>
                     <button
                       className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent"
                       onClick={() => setPastCollapsed(!pastCollapsed)}
@@ -1562,10 +1488,10 @@ export function AgendaClient() {
                           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
                           <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
                         </span>
-                        <p className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">Acontecendo Agora</p>
+                        <p className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">Acontecendo Agora ({dayAppointments.current.length})</p>
                       </>
                     ) : (
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Atual</p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Atual ({dayAppointments.current.length})</p>
                     )}
                   </div>
                   <button
@@ -1597,7 +1523,7 @@ export function AgendaClient() {
               {dayAppointments.future.length > 0 && (
                 <div className="pt-3">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Futuros</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Futuros ({dayAppointments.future.length})</p>
                     <button
                       className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent"
                       onClick={() => setFutureCollapsed(!futureCollapsed)}

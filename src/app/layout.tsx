@@ -4,6 +4,8 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SupabaseProvider } from "@/components/providers/supabase-provider"
 
+export const dynamic = "force-dynamic"
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

@@ -41,6 +41,8 @@ export function PatientsClient() {
   const [search, setSearch] = useState("")
   const [sortColumn, setSortColumn] = useState<"name" | "cpf" | "email" | "birth_date" | "active">("name")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [receptionistDentistIds, setReceptionistDentistIds] = useState<string[]>([])
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetch = useCallback(async (p?: number, ps?: number, s?: string) => {
@@ -48,6 +50,20 @@ export function PatientsClient() {
     const pageSizeNum = ps ?? pageSize
     const searchTerm = s ?? search
     const supabase = createClient()
+
+    let patientIds: string[] | null = null
+    if (userRole === "receptionist") {
+      if (receptionistDentistIds.length > 0) {
+        const { data: appts } = await supabase
+          .from("appointments")
+          .select("patient_id")
+          .in("dentist_id", receptionistDentistIds)
+        patientIds = [...new Set((appts ?? []).map((a) => a.patient_id))]
+      } else {
+        patientIds = []
+      }
+    }
+
     let query = supabase
       .from("patients")
       .select("*", { count: "exact" })
@@ -55,14 +71,31 @@ export function PatientsClient() {
     if (searchTerm) {
       query = query.or(`name.ilike.%${searchTerm}%,cpf.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
     }
+    if (patientIds !== null) {
+      query = query.in("id", patientIds.length > 0 ? patientIds : ["00000000-0000-0000-0000-000000000000"])
+    }
     const { data, count } = await query
       .range((pageNum - 1) * pageSizeNum, pageNum * pageSizeNum - 1)
     if (data) setPatients(data)
     if (count !== null) setTotal(count)
     setLoading(false)
-  }, [page, pageSize, search])
+  }, [page, pageSize, search, userRole, receptionistDentistIds])
 
   useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data: profile }) => {
+        if (!profile) return
+        setUserRole(profile.role)
+        if (profile.role === "receptionist") {
+          supabase.from("receptionist_dentists").select("dentist_id").eq("receptionist_id", user.id).then(({ data }) => {
+            const ids = data?.map((r) => r.dentist_id) ?? []
+            setReceptionistDentistIds(ids)
+          })
+        }
+      })
+    })
     fetch()
   }, [fetch])
 

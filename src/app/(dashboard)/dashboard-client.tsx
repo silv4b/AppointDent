@@ -46,6 +46,7 @@ export function DashboardClient() {
   const [greeting, setGreeting] = useState("Bom dia")
   const [userRole, setUserRole] = useState<string | null>(null)
   const [dentistId, setDentistId] = useState<string | null>(null)
+  const [receptionistDentistIds, setReceptionistDentistIds] = useState<string[]>([])
 
   useEffect(() => {
     const hour = new Date().getHours()
@@ -68,6 +69,12 @@ export function DashboardClient() {
             .eq("profile_id", user.id)
             .single()
           if (dentist) setDentistId(dentist.id)
+        } else if (profile.role === "receptionist") {
+          const { data: links } = await supabase
+            .from("receptionist_dentists")
+            .select("dentist_id")
+            .eq("receptionist_id", user.id)
+          setReceptionistDentistIds(links?.map((r) => r.dentist_id) ?? [])
         }
       })
   }, [user])
@@ -93,6 +100,14 @@ export function DashboardClient() {
     if (dentistId) {
       apptsQuery = apptsQuery.eq("dentist_id", dentistId)
       recentQuery = recentQuery.eq("dentist_id", dentistId)
+    } else if (userRole === "receptionist") {
+      if (receptionistDentistIds.length > 0) {
+        apptsQuery = apptsQuery.in("dentist_id", receptionistDentistIds)
+        recentQuery = recentQuery.in("dentist_id", receptionistDentistIds)
+      } else {
+        apptsQuery = apptsQuery.eq("dentist_id", "00000000-0000-0000-0000-000000000000")
+        recentQuery = recentQuery.eq("dentist_id", "00000000-0000-0000-0000-000000000000")
+      }
     }
 
     const [apptsCount, patientsCount, dentistsCount, proceduresCount, appts] = await Promise.all([
@@ -110,17 +125,18 @@ export function DashboardClient() {
       { label: "Procedimentos", value: String(proceduresCount.count ?? 0), change: "", trend: "up", icon: Syringe, chartColor: "chart-4" },
     ])
     setAppointments(appts.data as RecentAppointment[] ?? [])
-  }, [dentistId])
+  }, [dentistId, userRole, receptionistDentistIds])
 
   useEffect(() => {
     if (user && (userRole !== "dentist" || dentistId)) {
       fetchStats()
     }
-  }, [fetchStats, user, userRole, dentistId])
+  }, [fetchStats, user, userRole, dentistId, receptionistDentistIds])
 
   const userName = user?.user_metadata?.name as string | undefined
 
   const statusLabel: Record<string, string> = {
+    pending: "Pendente",
     scheduled: "Agendado",
     confirmed: "Confirmado",
     in_progress: "Em Andamento",
@@ -129,6 +145,7 @@ export function DashboardClient() {
   }
 
   const statusVariant: Record<string, string> = {
+    pending: "bg-purple-100 text-purple-800",
     scheduled: "bg-amber-100 text-amber-800",
     confirmed: "bg-blue-100 text-blue-800",
     in_progress: "bg-orange-100 text-orange-800",

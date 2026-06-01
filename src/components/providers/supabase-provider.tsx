@@ -1,7 +1,7 @@
 "use client"
 
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 
@@ -16,24 +16,34 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      setIsLoading(false)
-      router.refresh()
-    })
+    let cancelled = false
 
     supabase.auth.getUser().then(({ data }) => {
+      if (cancelled) return
       setUser(data.user)
       setIsLoading(false)
     })
 
-    return () => subscription.unsubscribe()
-  }, [supabase, router])
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return
+      setUser(session?.user ?? null)
+      setIsLoading(false)
+      if (event === "SIGNED_OUT") {
+        router.refresh()
+      }
+    })
+
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
+  }, [supabase, pathname, router])
 
   return <Context.Provider value={{ user, isLoading }}>{children}</Context.Provider>
 }

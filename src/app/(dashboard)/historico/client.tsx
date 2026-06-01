@@ -45,6 +45,7 @@ export function HistoricoClient() {
   const [endDate, setEndDate] = useState("")
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [currentDentistId, setCurrentDentistId] = useState<string | null>(null)
+  const [receptionistDentistIds, setReceptionistDentistIds] = useState<string[]>([])
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -57,6 +58,10 @@ export function HistoricoClient() {
         if (profile.role === "dentist") {
           supabase.from("dentists").select("id").eq("profile_id", user.id).single().then(({ data: dent }) => {
             if (dent) setCurrentDentistId(dent.id)
+          })
+        } else if (profile.role === "receptionist") {
+          supabase.from("receptionist_dentists").select("dentist_id").eq("receptionist_id", user.id).then(({ data }) => {
+            setReceptionistDentistIds(data?.map((r) => r.dentist_id) ?? [])
           })
         }
       })
@@ -77,12 +82,19 @@ export function HistoricoClient() {
     const supabase = createClient()
 
     const effectiveDentist = currentUserRole === "dentist" ? currentDentistId : dentistFilter !== "all" ? dentistFilter : null
+    const effectiveDentistIds = currentUserRole === "receptionist"
+      ? (dentistFilter !== "all" && receptionistDentistIds.includes(dentistFilter)
+        ? [dentistFilter]
+        : receptionistDentistIds)
+      : null
 
     let patientIds: string[] | null = null
 
-    if (effectiveDentist || start || end) {
+    if (effectiveDentist || effectiveDentistIds || start || end) {
       let idQuery = supabase.from("appointments").select("patient_id")
       if (effectiveDentist) idQuery = idQuery.eq("dentist_id", effectiveDentist)
+      if (effectiveDentistIds && effectiveDentistIds.length > 0) idQuery = idQuery.in("dentist_id", effectiveDentistIds)
+      else if (effectiveDentistIds) idQuery = idQuery.eq("dentist_id", "00000000-0000-0000-0000-000000000000")
       if (start) idQuery = idQuery.gte("start_time", start)
       if (end) idQuery = idQuery.lte("start_time", end)
       const { data } = await idQuery
@@ -104,7 +116,7 @@ export function HistoricoClient() {
     if (data) setPatients(data)
     if (count !== null) setTotal(count)
     setLoading(false)
-  }, [page, pageSize, search, filterDentist, startDate, endDate, currentUserRole, currentDentistId])
+  }, [page, pageSize, search, filterDentist, startDate, endDate, currentUserRole, currentDentistId, receptionistDentistIds])
 
   useEffect(() => {
     if (currentUserRole !== null) fetchPatients()
@@ -152,7 +164,10 @@ export function HistoricoClient() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os dentistas</SelectItem>
-                  {dentists.map((dent) => (
+                  {(currentUserRole === "receptionist" && receptionistDentistIds.length > 0
+                    ? dentists.filter((d) => receptionistDentistIds.includes(d.id))
+                    : dentists
+                  ).map((dent) => (
                     <SelectItem key={dent.id} value={dent.id}>{dent.name}</SelectItem>
                   ))}
                 </SelectContent>

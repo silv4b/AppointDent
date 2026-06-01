@@ -17,6 +17,7 @@ import {
 import {
   BookOpen,
   Calendar,
+  CheckCircle,
   ClipboardList,
   Clock,
   FileText,
@@ -90,6 +91,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
   const initials = getInitials(userName, userEmail)
 
   const isDentist = role === "dentist"
+  const isReceptionist = role === "receptionist"
 
   const navSections: NavSection[] = [
     {
@@ -106,8 +108,9 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
     {
       label: "Clínico",
       items: [
-        { href: "/anamnese", label: "Anamnese", icon: BookOpen as typeof LayoutDashboard },
+        { href: "/confirmacao", label: "Confirmação", icon: CheckCircle as typeof LayoutDashboard },
         { href: "/historico", label: "Histórico de Agendamentos", icon: Clock as typeof LayoutDashboard },
+        ...(isReceptionist ? [] : [{ href: "/anamnese", label: "Anamnese", icon: BookOpen as typeof LayoutDashboard }]),
         ...(isDentist ? [
           { href: "/minhas-anamneses", label: "Minhas Anamneses", icon: FileText as typeof LayoutDashboard },
           { href: "/meus-procedimentos", label: "Meus Procedimentos", icon: Syringe as typeof LayoutDashboard },
@@ -119,15 +122,17 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
       items: [
         { href: "/pacientes", label: "Pacientes", icon: Users as typeof LayoutDashboard },
         { href: "/dentistas", label: "Dentistas", icon: Stethoscope as typeof LayoutDashboard },
-        { href: "/procedimentos", label: "Procedimentos", icon: Syringe as typeof LayoutDashboard },
+        ...(isReceptionist ? [] : [{ href: "/procedimentos", label: "Procedimentos", icon: Syringe as typeof LayoutDashboard }]),
       ],
     }] as NavSection[]),
     ...(isDentist ? [] : [{
       label: "Configurações",
       items: [
         { href: "/horarios", label: "Grade de Horários", icon: Clock as typeof LayoutDashboard },
-        { href: "/admin/usuarios", label: "Usuários", icon: Shield as typeof LayoutDashboard },
-        { href: "/admin/solicitacoes", label: "Solicitações", icon: ClipboardList as typeof LayoutDashboard },
+        ...(isReceptionist ? [] : [
+          { href: "/admin/usuarios", label: "Usuários", icon: Shield as typeof LayoutDashboard },
+          { href: "/admin/solicitacoes", label: "Solicitações", icon: ClipboardList as typeof LayoutDashboard },
+        ]),
       ],
     }] as NavSection[]),
   ]

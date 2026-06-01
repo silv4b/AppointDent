@@ -25,9 +25,10 @@ import {
   deleteAvailabilitySlot,
   updateAvailabilitySlot,
 } from "@/lib/actions/availability-slots"
+import { updateClinicHours } from "@/lib/actions/clinic-hours"
 import { createClient } from "@/lib/supabase/client"
 import { Database } from "@/types/database"
-import { ChevronDown, Clock, Pencil, Plus, Trash2 } from "lucide-react"
+import { Building2, ChevronDown, Clock, Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { useCallback, useEffect, useState } from "react"
 
@@ -37,7 +38,11 @@ type Slot = Database["public"]["Tables"]["availability_slots"]["Row"] & {
 
 type Dentist = Database["public"]["Tables"]["dentists"]["Row"]
 
+type ClinicHour = Database["public"]["Tables"]["clinic_hours"]["Row"]
+
 const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+
+const DAY_NAMES_FULL = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"]
 
 function SlotDialog({
   open,
@@ -156,33 +161,236 @@ function SlotDialog({
   )
 }
 
+function ClinicHoursSection() {
+  const [hours, setHours] = useState<ClinicHour[]>([])
+  const [loading, setLoading] = useState(true)
+  const [savingDay, setSavingDay] = useState<number | null>(null)
+  const [edits, setEdits] = useState<Record<number, { open_time: string; close_time: string }>>({})
+
+  const fetch = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("clinic_hours")
+      .select("*")
+      .order("day_of_week")
+    if (data) {
+      setHours(data)
+      const initial: Record<number, { open_time: string; close_time: string }> = {}
+      for (const h of data) {
+        initial[h.day_of_week] = { open_time: h.open_time.slice(0, 5), close_time: h.close_time.slice(0, 5) }
+      }
+      setEdits(initial)
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetch()
+  }, [fetch])
+
+  const handleToggleOpen = async (day: ClinicHour) => {
+    const form = new FormData()
+    form.set("day_of_week", day.day_of_week.toString())
+    form.set("open_time", day.open_time)
+    form.set("close_time", day.close_time)
+    form.set("is_open", day.is_open ? "" : "on")
+    const result = await updateClinicHours(form)
+    if (result?.error) {
+      toast.error(result.error)
+    } else {
+      toast.success(day.is_open ? "Dia fechado" : "Dia aberto")
+      fetch()
+    }
+  }
+
+  const handleSaveDay = async (day: ClinicHour) => {
+    const edit = edits[day.day_of_week]
+    if (!edit) return
+    setSavingDay(day.day_of_week)
+    const form = new FormData()
+    form.set("day_of_week", day.day_of_week.toString())
+    form.set("open_time", edit.open_time)
+    form.set("close_time", edit.close_time)
+    form.set("is_open", day.is_open ? "on" : "")
+    const result = await updateClinicHours(form)
+    if (result?.error) {
+      toast.error(result.error)
+    } else {
+      toast.success(`${DAY_NAMES_FULL[day.day_of_week]} atualizado`)
+      fetch()
+    }
+    setSavingDay(null)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+        Carregando...
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-2xl border bg-card">
+      <div className="flex items-center gap-3 border-b px-6 py-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+          <Building2 className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold">Funcionamento da Clínica</h2>
+          <p className="text-xs text-muted-foreground">
+            Defina os horários de abertura e fechamento da clínica por dia da semana
+          </p>
+        </div>
+      </div>
+
+      <div className="divide-y">
+        {hours.map((day) => {
+          const edit = edits[day.day_of_week] ?? { open_time: day.open_time.slice(0, 5), close_time: day.close_time.slice(0, 5) }
+          const changed = edit.open_time !== day.open_time.slice(0, 5) || edit.close_time !== day.close_time.slice(0, 5)
+
+          return (
+            <ClinicHourRow
+              key={day.day_of_week}
+              day={day}
+              openTime={edit.open_time}
+              closeTime={edit.close_time}
+              changed={changed}
+              saving={savingDay === day.day_of_week}
+              onOpenTimeChange={(v) => setEdits((prev) => ({ ...prev, [day.day_of_week]: { ...prev[day.day_of_week], open_time: v } }))}
+              onCloseTimeChange={(v) => setEdits((prev) => ({ ...prev, [day.day_of_week]: { ...prev[day.day_of_week], close_time: v } }))}
+              onToggleOpen={() => handleToggleOpen(day)}
+              onSave={() => handleSaveDay(day)}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ClinicHourRow({
+  day,
+  openTime,
+  closeTime,
+  changed,
+  saving,
+  onOpenTimeChange,
+  onCloseTimeChange,
+  onToggleOpen,
+  onSave,
+}: {
+  day: ClinicHour
+  openTime: string
+  closeTime: string
+  changed: boolean
+  saving: boolean
+  onOpenTimeChange: (v: string) => void
+  onCloseTimeChange: (v: string) => void
+  onToggleOpen: () => void
+  onSave: () => void
+}) {
+
+  return (
+    <div className="flex items-center justify-between px-6 py-3 transition-colors hover:bg-muted/30">
+      <div className="flex items-center gap-4">
+        <span className={`min-w-[8rem] text-sm font-medium ${!day.is_open ? "text-muted-foreground line-through" : ""}`}>
+          {DAY_NAMES_FULL[day.day_of_week]}
+        </span>
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={day.is_open}
+            onChange={onToggleOpen}
+            className="h-4 w-4 rounded border-muted-foreground text-primary focus:ring-primary"
+          />
+          <span className="text-muted-foreground">{day.is_open ? "Aberto" : "Fechado"}</span>
+        </label>
+      </div>
+
+      {day.is_open && (
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Input
+              type="time"
+              value={openTime}
+              onChange={(e) => onOpenTimeChange(e.target.value)}
+              className="h-8 w-28"
+            />
+            <span className="text-sm text-muted-foreground">às</span>
+            <Input
+              type="time"
+              value={closeTime}
+              onChange={(e) => onCloseTimeChange(e.target.value)}
+              className="h-8 w-28"
+            />
+          </div>
+          {changed && (
+            <Button size="sm" onClick={onSave} disabled={saving}>
+              {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function HorariosClient() {
   const [slots, setSlots] = useState<Slot[]>([])
   const [dentists, setDentists] = useState<Dentist[]>([])
   const [edit, setEdit] = useState<Slot | null>(null)
   const [open, setOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [receptionistDentistIds, setReceptionistDentistIds] = useState<string[]>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [selectedDentistId, setSelectedDentistId] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(true)
 
   const fetch = useCallback(async () => {
     const supabase = createClient()
+
+    let slotsQuery = supabase
+      .from("availability_slots")
+      .select("*, dentists(name)")
+      .order("dentist_id")
+      .order("day_of_week")
+      .order("start_time")
+
+    if (userRole === "receptionist") {
+      if (receptionistDentistIds.length > 0) {
+        slotsQuery = slotsQuery.in("dentist_id", receptionistDentistIds)
+      } else {
+        slotsQuery = slotsQuery.eq("dentist_id", "00000000-0000-0000-0000-000000000000")
+      }
+    }
+
     const [slotsResult, dentistsData] = await Promise.all([
-      supabase
-        .from("availability_slots")
-        .select("*, dentists(name)")
-        .order("dentist_id")
-        .order("day_of_week")
-        .order("start_time"),
+      slotsQuery,
       supabase.from("dentists").select("*").order("name").then((r) => r.data ?? []),
     ])
     if (slotsResult.data) setSlots(slotsResult.data as Slot[])
-    setDentists(dentistsData)
+    setDentists(userRole === "receptionist" && receptionistDentistIds.length > 0
+      ? dentistsData.filter((d) => receptionistDentistIds.includes(d.id))
+      : dentistsData)
     setLoading(false)
-  }, [])
+  }, [userRole, receptionistDentistIds])
 
   useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data: profile }) => {
+        if (!profile) return
+        setUserRole(profile.role)
+        if (profile.role === "receptionist") {
+          supabase.from("receptionist_dentists").select("dentist_id").eq("receptionist_id", user.id).then(({ data }) => {
+            setReceptionistDentistIds(data?.map((r) => r.dentist_id) ?? [])
+          })
+        }
+      })
+    })
     fetch()
   }, [fetch])
 
@@ -236,6 +444,10 @@ export function HorariosClient() {
         </div>
       </div>
 
+      <div className="mb-8">
+        <ClinicHoursSection />
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
           Carregando...
@@ -245,7 +457,7 @@ export function HorariosClient() {
           {grouped.map(({ dentist, slots: dentistSlots }) => {
             const isExpanded = expanded[dentist.id] ?? true
             return (
-              <div key={dentist.id} className={`rounded-2xl border bg-card transition-shadow`}>
+              <div key={dentist.id} className="rounded-2xl border bg-card transition-shadow">
                 <div
                   role="button"
                   tabIndex={0}

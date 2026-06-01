@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog"
 import { DataTablePagination } from "@/components/data-table-pagination"
 import { createUser, deleteUser, getUsers, updateUser } from "@/lib/actions/admin"
+import { createClient } from "@/lib/supabase/client"
 import { ArrowDown, ArrowUp, ArrowUpDown, Eye, EyeOff, Pencil, Plus, Search, Trash2, X } from "lucide-react"
 import { useCallback, useEffect, useRef, useState, startTransition } from "react"
 import { toast } from "sonner"
@@ -73,6 +74,18 @@ function CriarUsuarioDialog({
   const [saving, setSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [dentistIds, setDentistIds] = useState<string[]>([])
+  const [dentists, setDentists] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    if (open) {
+      const supabase = createClient()
+      supabase.from("dentists").select("id, name").eq("active", true).order("name").then(({ data }) => {
+        if (data) setDentists(data)
+      })
+      setDentistIds([])
+    }
+  }, [open])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,6 +96,9 @@ function CriarUsuarioDialog({
     form.set("confirmPassword", confirmPassword)
     form.set("role", role)
     if (role === "dentist") form.set("specialty", specialty)
+    if (role === "receptionist") {
+      form.set("dentist_ids", JSON.stringify(dentistIds))
+    }
 
     setSaving(true)
     const result = await createUser(form)
@@ -94,6 +110,12 @@ function CriarUsuarioDialog({
       onSuccess()
     }
     setSaving(false)
+  }
+
+  const toggleDentist = (id: string) => {
+    setDentistIds((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+    )
   }
 
   return (
@@ -132,7 +154,7 @@ function CriarUsuarioDialog({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="user-role">Função</Label>
-            <Select value={role} onValueChange={(v) => setRole(v ?? "")}>
+            <Select value={role} onValueChange={(v) => { setRole(v ?? ""); setDentistIds([]) }}>
               <SelectTrigger id="user-role" className="w-full">
                 <span className="flex flex-1 text-left">{role ? roleLabel[role] ?? role : <span className="text-muted-foreground">Selecione...</span>}</span>
               </SelectTrigger>
@@ -147,6 +169,24 @@ function CriarUsuarioDialog({
             <div className="flex flex-col gap-2">
               <Label htmlFor="user-specialty">Especialidade</Label>
               <Input id="user-specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Clínico Geral, Ortodontia..." />
+            </div>
+          )}
+          {role === "receptionist" && dentists.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <Label>Vincular a dentistas</Label>
+              <div className="max-h-40 overflow-y-auto rounded-lg border p-2 space-y-1">
+                {dentists.map((d) => (
+                  <label key={d.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                    <input
+                      type="checkbox"
+                      checked={dentistIds.includes(d.id)}
+                      onChange={() => toggleDentist(d.id)}
+                      className="h-4 w-4 rounded border-muted-foreground text-primary focus:ring-primary"
+                    />
+                    {d.name}
+                  </label>
+                ))}
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -180,6 +220,22 @@ function EditarUsuarioDialog({
   const [saving, setSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [dentistIds, setDentistIds] = useState<string[]>([])
+  const [dentists, setDentists] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    if (open && user) {
+      const supabase = createClient()
+      supabase.from("dentists").select("id, name").eq("active", true).order("name").then(({ data }) => {
+        if (data) setDentists(data)
+      })
+      if (user.role === "receptionist") {
+        supabase.from("receptionist_dentists").select("dentist_id").eq("receptionist_id", user.id).then(({ data }) => {
+          if (data) setDentistIds(data.map((r) => r.dentist_id))
+        })
+      }
+    }
+  }, [open, user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -190,6 +246,9 @@ function EditarUsuarioDialog({
     form.set("email", email)
     form.set("role", role)
     if (role === "dentist") form.set("specialty", specialty)
+    if (role === "receptionist") {
+      form.set("dentist_ids", JSON.stringify(dentistIds))
+    }
     if (password) {
       form.set("password", password)
       form.set("confirmPassword", confirmPassword)
@@ -205,6 +264,12 @@ function EditarUsuarioDialog({
       onSuccess()
     }
     setSaving(false)
+  }
+
+  const toggleDentist = (id: string) => {
+    setDentistIds((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+    )
   }
 
   return (
@@ -240,6 +305,24 @@ function EditarUsuarioDialog({
             <div className="flex flex-col gap-2">
               <Label htmlFor="edit-specialty">Especialidade</Label>
               <Input id="edit-specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Clínico Geral, Ortodontia..." />
+            </div>
+          )}
+          {role === "receptionist" && dentists.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <Label>Vincular a dentistas</Label>
+              <div className="max-h-40 overflow-y-auto rounded-lg border p-2 space-y-1">
+                {dentists.map((d) => (
+                  <label key={d.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                    <input
+                      type="checkbox"
+                      checked={dentistIds.includes(d.id)}
+                      onChange={() => toggleDentist(d.id)}
+                      className="h-4 w-4 rounded border-muted-foreground text-primary focus:ring-primary"
+                    />
+                    {d.name}
+                  </label>
+                ))}
+              </div>
             </div>
           )}
           <div className="flex flex-col gap-2">

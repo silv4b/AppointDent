@@ -72,6 +72,7 @@ export function PacienteAnamneseClient({ pacienteId, appointmentId, sessionId }:
   const [userRole, setUserRole] = useState<string | null>(null)
   const [dentists, setDentists] = useState<Database["public"]["Tables"]["dentists"]["Row"][]>([])
   const [selectedDentistId, setSelectedDentistId] = useState("")
+  const [receptionistDentistIds, setReceptionistDentistIds] = useState<string[]>([])
 
   const [formTitle, setFormTitle] = useState("")
   const [formFields, setFormFields] = useState<AnamneseField[]>([{ _id: 0, label: "", content: "" }])
@@ -93,6 +94,7 @@ export function PacienteAnamneseClient({ pacienteId, appointmentId, sessionId }:
   const [linkedAppointment, setLinkedAppointment] = useState<Appointment | null>(null)
 
   const statusColorMap: Record<string, string> = {
+    pending: "bg-purple-100 text-purple-800",
     scheduled: "bg-amber-100 text-amber-800",
     confirmed: "bg-blue-100 text-blue-800",
     in_progress: "bg-orange-100 text-orange-800",
@@ -101,6 +103,7 @@ export function PacienteAnamneseClient({ pacienteId, appointmentId, sessionId }:
   }
 
   const statusLabelMap: Record<string, string> = {
+    pending: "Pendente",
     scheduled: "Agendado",
     confirmed: "Confirmado",
     in_progress: "Em Andamento",
@@ -204,20 +207,47 @@ export function PacienteAnamneseClient({ pacienteId, appointmentId, sessionId }:
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
 
-        const [patientRes, apptsRes, sessionsRes, profileRes, dentistsRes] = await Promise.all([
-          supabase.from("patients").select("*").eq("id", pacienteId).single(),
-          supabase
-            .from("appointments")
-            .select("*, patients(name), dentists(name), procedures(name, color, duration_minutes)")
-            .eq("patient_id", pacienteId)
-            .order("start_time", { ascending: false }),
-          supabase
-            .from("anamnese_sessions")
-            .select("*, appointments(patients(name), dentists(name)), patients(name), dentists(name)")
-            .eq("patient_id", pacienteId)
-            .order("created_at", { ascending: false }),
+        const [profileRes, dentistsRes] = await Promise.all([
           supabase.from("profiles").select("role").eq("id", user?.id ?? "").single(),
           supabase.from("dentists").select("*").order("name"),
+        ])
+
+        if (cancelled) return
+
+        const role = profileRes.data?.role ?? null
+        setUserRole(role)
+
+        let dentistIds: string[] = []
+        if (role === "receptionist") {
+          const { data: receptionistDentists } = await supabase
+            .from("receptionist_dentists")
+            .select("dentist_id")
+            .eq("receptionist_id", user?.id ?? "")
+          dentistIds = (receptionistDentists ?? []).map((rd) => rd.dentist_id)
+          setReceptionistDentistIds(dentistIds)
+        } else {
+          setReceptionistDentistIds([])
+        }
+
+        let apptsQuery = supabase
+          .from("appointments")
+          .select("*, patients(name), dentists(name), procedures(name, color, duration_minutes)")
+          .eq("patient_id", pacienteId)
+        let sessionsQuery = supabase
+          .from("anamnese_sessions")
+          .select("*, appointments(patients(name), dentists(name)), patients(name), dentists(name)")
+          .eq("patient_id", pacienteId)
+
+        if (role === "receptionist") {
+          const ids = dentistIds.length > 0 ? dentistIds : ["00000000-0000-0000-0000-000000000000"]
+          apptsQuery = apptsQuery.in("dentist_id", ids)
+          sessionsQuery = sessionsQuery.in("dentist_id", ids)
+        }
+
+        const [patientRes, apptsRes, sessionsRes] = await Promise.all([
+          supabase.from("patients").select("*").eq("id", pacienteId).single(),
+          apptsQuery.order("start_time", { ascending: false }),
+          sessionsQuery.order("created_at", { ascending: false }),
         ])
 
         if (cancelled) return
@@ -225,7 +255,6 @@ export function PacienteAnamneseClient({ pacienteId, appointmentId, sessionId }:
         setPatient(patientRes.data ?? null)
         setAppointments(apptsRes.data ?? [])
         setSessions(sessionsRes.data as AnamneseSession[] ?? [])
-        setUserRole(profileRes.data?.role ?? null)
         setDentists(dentistsRes.data ?? [])
         setLoading(false)
       })()
@@ -238,26 +267,50 @@ export function PacienteAnamneseClient({ pacienteId, appointmentId, sessionId }:
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    const [patientRes, apptsRes, sessionsRes, profileRes, dentistsRes] = await Promise.all([
-      supabase.from("patients").select("*").eq("id", pacienteId).single(),
-      supabase
-        .from("appointments")
-        .select("*, patients(name), dentists(name), procedures(name, color, duration_minutes)")
-        .eq("patient_id", pacienteId)
-        .order("start_time", { ascending: false }),
-      supabase
-        .from("anamnese_sessions")
-        .select("*, appointments(patients(name), dentists(name)), patients(name), dentists(name)")
-        .eq("patient_id", pacienteId)
-        .order("created_at", { ascending: false }),
+    const [profileRes, dentistsRes] = await Promise.all([
       supabase.from("profiles").select("role").eq("id", user?.id ?? "").single(),
       supabase.from("dentists").select("*").order("name"),
+    ])
+
+    const role = profileRes.data?.role ?? null
+    setUserRole(role)
+
+    let dentistIds: string[] = []
+    if (role === "receptionist") {
+      const { data: receptionistDentists } = await supabase
+        .from("receptionist_dentists")
+        .select("dentist_id")
+        .eq("receptionist_id", user?.id ?? "")
+      dentistIds = (receptionistDentists ?? []).map((rd) => rd.dentist_id)
+      setReceptionistDentistIds(dentistIds)
+    } else {
+      setReceptionistDentistIds([])
+    }
+
+    let apptsQuery = supabase
+      .from("appointments")
+      .select("*, patients(name), dentists(name), procedures(name, color, duration_minutes)")
+      .eq("patient_id", pacienteId)
+    let sessionsQuery = supabase
+      .from("anamnese_sessions")
+      .select("*, appointments(patients(name), dentists(name)), patients(name), dentists(name)")
+      .eq("patient_id", pacienteId)
+
+    if (role === "receptionist") {
+      const ids = dentistIds.length > 0 ? dentistIds : ["00000000-0000-0000-0000-000000000000"]
+      apptsQuery = apptsQuery.in("dentist_id", ids)
+      sessionsQuery = sessionsQuery.in("dentist_id", ids)
+    }
+
+    const [patientRes, apptsRes, sessionsRes] = await Promise.all([
+      supabase.from("patients").select("*").eq("id", pacienteId).single(),
+      apptsQuery.order("start_time", { ascending: false }),
+      sessionsQuery.order("created_at", { ascending: false }),
     ])
 
     setPatient(patientRes.data ?? null)
     setAppointments(apptsRes.data ?? [])
     setSessions(sessionsRes.data as AnamneseSession[] ?? [])
-    setUserRole(profileRes.data?.role ?? null)
     setDentists(dentistsRes.data ?? [])
     setLoading(false)
   }
@@ -662,7 +715,9 @@ export function PacienteAnamneseClient({ pacienteId, appointmentId, sessionId }:
                       <span className="flex flex-1 text-left">{selectedDentistId ? dentists.find((d) => d.id === selectedDentistId)?.name ?? selectedDentistId : <span className="text-muted-foreground">Selecione um dentista...</span>}</span>
                     </SelectTrigger>
                     <SelectContent>
-                      {dentists.map((d) => (
+                      {dentists
+                        .filter((d) => userRole !== "receptionist" || receptionistDentistIds.includes(d.id))
+                        .map((d) => (
                         <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                       ))}
                     </SelectContent>

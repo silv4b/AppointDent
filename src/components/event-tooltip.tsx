@@ -49,7 +49,7 @@ export function EventTooltip({ content, children }: EventTooltipProps) {
       ref={triggerRef}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="size-full"
+      className="w-full"
     >
       {children}
       {visible && mounted && createPortal(

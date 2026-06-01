@@ -216,6 +216,7 @@ export function MinhaAgendaClient() {
   }
 
   const statusVariant: Record<string, string> = {
+    pending: "bg-purple-100 text-purple-800",
     scheduled: "bg-amber-100 text-amber-800",
     confirmed: "bg-blue-100 text-blue-800",
     in_progress: "bg-orange-100 text-orange-800",

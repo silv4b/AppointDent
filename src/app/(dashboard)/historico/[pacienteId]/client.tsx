@@ -50,6 +50,7 @@ export function PacienteDetailClient({ pacienteId }: DetailClientProps) {
   const [loading, setLoading] = useState(true)
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [currentDentistId, setCurrentDentistId] = useState<string | null>(null)
+  const [receptionistDentistIds, setReceptionistDentistIds] = useState<string[]>([])
   const [viewSession, setViewSession] = useState<AnamneseWithAppt | null>(null)
 
   const statusColorMap: Record<string, string> = {
@@ -83,6 +84,9 @@ export function PacienteDetailClient({ pacienteId }: DetailClientProps) {
       if (profile.role === "dentist") {
         const { data: dent } = await supabase.from("dentists").select("id").eq("profile_id", user.id).single()
         if (dent) dentId = dent.id
+      } else if (profile.role === "receptionist") {
+        const { data: recDents } = await supabase.from("receptionist_dentists").select("dentist_id").eq("receptionist_id", user.id)
+        if (recDents) setReceptionistDentistIds(recDents.map((r) => r.dentist_id))
       }
     }
     setCurrentUserRole(role)
@@ -100,6 +104,10 @@ export function PacienteDetailClient({ pacienteId }: DetailClientProps) {
 
     if (role === "dentist" && dentId) {
       apptQuery = apptQuery.eq("dentist_id", dentId)
+    } else if (role === "receptionist") {
+      apptQuery = receptionistDentistIds.length > 0
+        ? apptQuery.in("dentist_id", receptionistDentistIds)
+        : apptQuery.eq("dentist_id", "00000000-0000-0000-0000-000000000000")
     }
 
     const { data: appts } = await apptQuery
@@ -113,13 +121,17 @@ export function PacienteDetailClient({ pacienteId }: DetailClientProps) {
 
     if (role === "dentist" && dentId) {
       anamQuery = anamQuery.eq("dentist_id", dentId)
+    } else if (role === "receptionist") {
+      anamQuery = receptionistDentistIds.length > 0
+        ? anamQuery.in("dentist_id", receptionistDentistIds)
+        : anamQuery.eq("dentist_id", "00000000-0000-0000-0000-000000000000")
     }
 
     const { data: anams } = await anamQuery
     if (anams) setAnamneses(anams as AnamneseWithAppt[])
 
     setLoading(false)
-  }, [pacienteId])
+  }, [pacienteId, receptionistDentistIds])
 
   useEffect(() => {
     fetch()

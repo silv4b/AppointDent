@@ -19,7 +19,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-blue-50 via-white to-cyan-50 p-4">
-      <div className="flex w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white">
+      <div className="flex w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white border">
         <div className="flex flex-col items-center justify-center gap-4 bg-linear-to-br from-blue-600 to-blue-700 p-10 text-white">
           <div className="rounded-full bg-white/20 p-4">
             <Image src="/assets/tooth-icon.png" alt="Ícone" width={48} height={48} />
