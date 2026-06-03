@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { format } from "date-fns"
 import { isSameDay, startOfDay } from "date-fns"
-import { CalendarDays, Check, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react"
+import { CalendarDays, Check, Copy, Eye, MessageCircle, PanelLeftClose, PanelLeftOpen, Search, X, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -24,6 +24,13 @@ import {
 import { DataTablePagination } from "@/components/data-table-pagination"
 import { MiniCalendar } from "@/components/mini-calendar"
 import { ConfirmDialog } from "@/components/confirm-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { getPendingAppointments, confirmAppointment, rejectAppointment } from "@/lib/actions/appointments"
 import { createClient } from "@/lib/supabase/client"
 import { useLocalStorage } from "@/hooks/use-local-storage"
@@ -50,10 +57,14 @@ export function ConfirmacaoClient() {
   const [rejectTarget, setRejectTarget] = useState<Appointment | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [rejecting, setRejecting] = useState(false)
+  const [patientDetails, setPatientDetails] = useState<Database["public"]["Tables"]["patients"]["Row"] | null>(null)
+  const [patientDetailsOpen, setPatientDetailsOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage("confirmacao:sidebarCollapsed", false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [currentDentistId, setCurrentDentistId] = useState<string | null>(null)
   const [receptionistDentistIds, setReceptionistDentistIds] = useState<string[]>([])
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const bulkLoadingRef = useRef(false)
 
   const supabase = createClient()
 
@@ -81,7 +92,6 @@ export function ConfirmacaoClient() {
   }, [supabase])
 
   const fetchPending = useCallback(async () => {
-    setLoading(true)
     const [data, dentistsData] = await Promise.all([
       getPendingAppointments(),
       supabase.from("dentists").select("id, name").eq("active", true).order("name").then((r) => r.data ?? []),
@@ -140,30 +150,97 @@ export function ConfirmacaoClient() {
 
   const handleConfirm = async () => {
     if (!confirmTarget) return
+    const target = confirmTarget
     setConfirming(true)
-    const result = await confirmAppointment(confirmTarget.id)
-    setConfirming(false)
     setConfirmTarget(null)
+    setAppointments(prev => prev.filter(a => a.id !== target.id))
+    const result = await confirmAppointment(target.id)
+    setConfirming(false)
     if (result?.error) {
       toast.error(result.error)
+      fetchPending()
     } else {
       toast.success("Agendamento confirmado com sucesso!")
-      fetchPending()
     }
   }
 
   const handleReject = async () => {
     if (!rejectTarget) return
+    const target = rejectTarget
     setRejecting(true)
-    const result = await rejectAppointment(rejectTarget.id)
-    setRejecting(false)
     setRejectTarget(null)
+    setAppointments(prev => prev.filter(a => a.id !== target.id))
+    const result = await rejectAppointment(target.id)
+    setRejecting(false)
     if (result?.error) {
       toast.error(result.error)
+      fetchPending()
     } else {
       toast.success("Agendamento cancelado.")
-      fetchPending()
     }
+  }
+
+  const handleViewPatient = async (appointment: Appointment) => {
+    const { data } = await supabase
+      .from("patients")
+      .select("*")
+      .eq("id", appointment.patient_id)
+      .single()
+    if (data) {
+      setPatientDetails(data)
+      setPatientDetailsOpen(true)
+    }
+  }
+
+  const selectedCount = selectedIds.length
+  const isAllSelected = paginated.length > 0 && paginated.every(a => selectedIds.includes(a.id))
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(prev => prev.filter(id => !paginated.some(a => a.id === id)))
+    } else {
+      const ids = new Set(selectedIds)
+      paginated.forEach(a => ids.add(a.id))
+      setSelectedIds([...ids])
+    }
+  }
+
+  const handleSelectOne = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+  }
+
+  const handleBulkConfirm = async () => {
+    if (bulkLoadingRef.current || selectedCount === 0) return
+    bulkLoadingRef.current = true
+    const ids = [...selectedIds]
+    setSelectedIds([])
+    setAppointments(prev => prev.filter(a => !ids.includes(a.id)))
+    const results = await Promise.all(ids.map(id => confirmAppointment(id)))
+    const errors = results.filter(r => r?.error)
+    if (errors.length > 0) {
+      toast.error(`${errors.length} de ${ids.length} agendamento(s) não confirmados.`)
+      fetchPending()
+    } else {
+      toast.success(`${ids.length} agendamento(s) confirmado(s)!`)
+    }
+    bulkLoadingRef.current = false
+  }
+
+  const handleBulkReject = async () => {
+    if (bulkLoadingRef.current || selectedCount === 0) return
+    bulkLoadingRef.current = true
+    const ids = [...selectedIds]
+    setSelectedIds([])
+    setAppointments(prev => prev.filter(a => !ids.includes(a.id)))
+    const results = await Promise.all(ids.map(id => rejectAppointment(id)))
+    const errors = results.filter(r => r?.error)
+    if (errors.length > 0) {
+      toast.error(`${errors.length} de ${ids.length} agendamento(s) não recusados.`)
+      fetchPending()
+    } else {
+      toast.success(`${ids.length} agendamento(s) recusado(s)!`)
+    }
+    bulkLoadingRef.current = false
   }
 
   return (
@@ -213,28 +290,67 @@ export function ConfirmacaoClient() {
               )}
             </div>
 
+            {selectedCount > 0 && (
+              <div className="flex items-center gap-2 border-b px-4 py-2">
+                <span className="text-sm text-muted-foreground">
+                  {selectedCount} selecionado{selectedCount > 1 ? "s" : ""}
+                </span>
+                <div className="ml-auto flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-green-600 border-green-200 hover:bg-green-50"
+                    onClick={handleBulkConfirm}
+                    disabled={bulkLoadingRef.current}
+                  >
+                    {bulkLoadingRef.current ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    Confirmar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={handleBulkReject}
+                    disabled={bulkLoadingRef.current}
+                  >
+                    {bulkLoadingRef.current ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                    Recusar
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Paciente</TableHead>
-                  <TableHead>Dentista</TableHead>
-                  <TableHead>Procedimento</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Horário</TableHead>
-                  <TableHead>Situação</TableHead>
-                  <TableHead className="w-52">Ações</TableHead>
+                  <TableHead className="w-10">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary cursor-pointer"
+                      checked={isAllSelected}
+                      onChange={handleSelectAll}
+                      disabled={paginated.length === 0}
+                    />
+                  </TableHead>
+                  <TableHead className="text-left">Paciente</TableHead>
+                  <TableHead className="text-left">Dentista</TableHead>
+                  <TableHead className="text-left">Procedimento</TableHead>
+                  <TableHead className="text-left">Data</TableHead>
+                  <TableHead className="text-left">Horário</TableHead>
+                  <TableHead className="text-left">Situação</TableHead>
+                  <TableHead className="w-52 text-left">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                       Carregando...
                     </TableCell>
                   </TableRow>
                 ) : paginated.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                       {filterDate
                         ? "Nenhum agendamento pendente para esta data."
                         : "Nenhum agendamento pendente."}
@@ -242,7 +358,15 @@ export function ConfirmacaoClient() {
                   </TableRow>
                 ) : (
                   paginated.map((a) => (
-                    <TableRow key={a.id}>
+                    <TableRow key={a.id} className={selectedIds.includes(a.id) ? "bg-muted/30" : ""}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-primary cursor-pointer"
+                          checked={selectedIds.includes(a.id)}
+                          onChange={() => handleSelectOne(a.id)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{a.patients?.name ?? "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{a.dentists?.name ?? "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{a.procedures?.name ?? "—"}</TableCell>
@@ -253,29 +377,38 @@ export function ConfirmacaoClient() {
                         {format(new Date(a.start_time), "HH:mm")} – {format(new Date(a.end_time), "HH:mm")}
                       </TableCell>
                       <TableCell>
-                        <span className="inline-flex items-center rounded-md border border-transparent bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800 min-w-[7.5rem] justify-center">
+                        <span className="inline-flex items-center rounded-md border border-transparent bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
                           Pendente
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-1">
                           <Button
                             variant="outline"
-                            size="sm"
-                            className="h-8 gap-1 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                            size="icon"
+                            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
                             onClick={() => setConfirmTarget(a)}
+                            title="Confirmar"
                           >
-                            <Check className="h-3 w-3" />
-                            Confirmar
+                            <Check className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="outline"
-                            size="sm"
-                            className="h-8 gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                             onClick={() => setRejectTarget(a)}
+                            title="Recusar"
                           >
-                            <X className="h-3 w-3" />
-                            Recusar
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleViewPatient(a)}
+                            title="Ver dados do paciente"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </TableCell>
@@ -367,6 +500,65 @@ export function ConfirmacaoClient() {
         onConfirm={handleReject}
         loading={rejecting}
       />
+
+      <Dialog open={patientDetailsOpen} onOpenChange={setPatientDetailsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Dados do Paciente</DialogTitle>
+            <DialogDescription>
+              Informações de contato e dados cadastrais.
+            </DialogDescription>
+          </DialogHeader>
+          {patientDetails && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2">
+                <span className="text-muted-foreground">Nome</span>
+                <span className="font-medium">{patientDetails.name}</span>
+                <span className="text-muted-foreground">CPF</span>
+                <span>{patientDetails.cpf ?? "—"}</span>
+                <span className="text-muted-foreground">Telefone</span>
+                <span className="flex items-center gap-1.5">
+                  {patientDetails.phone ?? "—"}
+                  {patientDetails.phone && (
+                    <>
+                      <a
+                        href={`https://wa.me/${patientDetails.phone.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Abrir WhatsApp"
+                      >
+                        <MessageCircle className="h-4 w-4 text-green-600 hover:text-green-700" />
+                      </a>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(patientDetails.phone!); toast.success("Telefone copiado") }}
+                        title="Copiar telefone"
+                      >
+                        <Copy className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                      </button>
+                    </>
+                  )}
+                </span>
+                <span className="text-muted-foreground">E-mail</span>
+                <span className="flex items-center gap-1.5">
+                  {patientDetails.email ?? "—"}
+                  {patientDetails.email && (
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(patientDetails.email!); toast.success("E-mail copiado") }}
+                      title="Copiar e-mail"
+                    >
+                      <Copy className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  )}
+                </span>
+                <span className="text-muted-foreground">Nascimento</span>
+                <span>{patientDetails.birth_date ? format(new Date(patientDetails.birth_date), "dd/MM/yyyy") : "—"}</span>
+                <span className="text-muted-foreground">Observações</span>
+                <span>{patientDetails.notes ?? "—"}</span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
