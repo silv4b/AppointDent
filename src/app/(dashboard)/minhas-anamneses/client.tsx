@@ -54,17 +54,19 @@ if ("data" in res) setTemplates(res.data as unknown as Template[])
 
   const handleDelete = async () => {
     if (!deleteId) return
+    const targetId = deleteId
     setDeleting(true)
+    setDeleteId(null)
+    setTemplates(prev => prev.filter(t => t.id !== targetId))
     const form = new FormData()
-    form.set("id", deleteId)
+    form.set("id", targetId)
     const result = await deleteAnamnesisTemplate(form)
     if (result?.error) {
       toast.error(result.error)
-    } else {
-      toast.success("Modelo excluído")
-      setDeleteId(null)
       const res = await getMyAnamnesisTemplates()
       if ("data" in res) setTemplates(res.data as unknown as Template[])
+    } else {
+      toast.success("Modelo excluído")
     }
     setDeleting(false)
   }
@@ -126,9 +128,11 @@ if ("data" in res) setTemplates(res.data as unknown as Template[])
                     {new Date(t.created_at).toLocaleDateString("pt-BR")}
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(t.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex justify-center">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(t.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

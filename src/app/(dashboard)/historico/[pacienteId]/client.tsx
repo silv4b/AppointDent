@@ -238,13 +238,15 @@ export function PacienteDetailClient({ pacienteId }: DetailClientProps) {
                           )}
                         </TableCell>
                         <TableCell>
-                          {linked.length === 1 ? (
-                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver anamnese" onClick={() => linked[0] && setViewSession(linked[0])}>
-                              <Eye className="h-3.5 w-3.5" />
-                            </Button>
-                          ) : (
-                            <span className="text-[11px] text-muted-foreground/60">—</span>
-                          )}
+                          <div className="flex justify-center">
+                            {linked.length === 1 ? (
+                              <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver anamnese" onClick={() => linked[0] && setViewSession(linked[0])}>
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground/60">—</span>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     )
@@ -302,9 +304,11 @@ export function PacienteDetailClient({ pacienteId }: DetailClientProps) {
                         {a.notes ?? "-"}
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver anamnese" onClick={() => setViewSession(a)}>
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex justify-center">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver anamnese" onClick={() => setViewSession(a)}>
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

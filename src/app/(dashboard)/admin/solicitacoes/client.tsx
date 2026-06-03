@@ -57,8 +57,6 @@ export function SolicitacoesClient() {
   const searchRef = useRef<HTMLInputElement>(null)
 
   const fetch = useCallback(async () => {
-    setLoading(true)
-    setPage(1)
     const data = await getPendingProcedureRequests()
     setRequests(data as PendingRequest[])
     setLoading(false)
@@ -85,12 +83,14 @@ export function SolicitacoesClient() {
     if (req.description) form.set("description", req.description)
     form.set("duration_minutes", String(req.duration_minutes))
     if (req.price != null) form.set("price", String(req.price))
+    setRequests(prev => prev.filter(r => r.id !== req.id))
     const result = await approveProcedureRequest(form)
-    if (result?.error) toast.error(result.error)
-    else {
+    if (result?.error) {
+      toast.error(result.error)
+      fetch()
+    } else {
       toast.success(`Procedimento "${req.name}" aprovado!`)
       setApproveConfirmId(null)
-      fetch()
     }
     setActionLoading(false)
     setActionId(null)
@@ -103,13 +103,15 @@ export function SolicitacoesClient() {
     const form = new FormData()
     form.set("id", rejectId)
     form.set("rejection_reason", rejectReason)
+    setRequests(prev => prev.filter(r => r.id !== rejectId))
     const result = await rejectProcedureRequest(form)
-    if (result?.error) toast.error(result.error)
-    else {
+    if (result?.error) {
+      toast.error(result.error)
+      fetch()
+    } else {
       toast.success("Solicitação rejeitada")
       setRejectOpen(false)
       setRejectReason("")
-      fetch()
     }
     setActionLoading(false)
     setActionId(null)
@@ -199,8 +201,8 @@ export function SolicitacoesClient() {
                   <TableCell className="text-muted-foreground text-sm">
                     {new Date(r.created_at).toLocaleDateString("pt-BR")}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
+                  <TableCell>
+                    <div className="flex justify-center gap-1">
                       <Button
                         variant="ghost"
                         size="sm"

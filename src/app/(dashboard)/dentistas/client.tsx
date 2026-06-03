@@ -67,11 +67,15 @@ export function DentistsClient() {
   const handleDelete = async (id: string) => {
     const form = new FormData()
     form.set("id", id)
+    setDentists(prev => prev.filter(d => d.id !== id))
     const result = await deleteDentist(form)
-    if (result?.error) toast.error(result.error)
-    else toast.success("Dentista excluído")
-    setPage(1)
-    fetch(1)
+    if (result?.error) {
+      toast.error(result.error)
+      setPage(1)
+      fetch(1)
+    } else {
+      toast.success("Dentista excluído")
+    }
   }
 
   const toggleSort = (col: typeof sortColumn) => {
@@ -185,8 +189,8 @@ export function DentistsClient() {
                       {d.active ? "Ativo" : "Inativo"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
+                  <TableCell>
+                    <div className="flex justify-center gap-1">
                       <Button variant="ghost" size="icon" onClick={() => { setEdit(d); setOpen(true) }}>
                         <Pencil className="h-4 w-4" />
                       </Button>

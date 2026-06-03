@@ -157,11 +157,15 @@ export function ProceduresClient() {
   const handleDelete = async (id: string) => {
     const form = new FormData()
     form.set("id", id)
+    setProcedures(prev => prev.filter(p => p.id !== id))
     const result = await deleteProcedure(form)
-    if (result?.error) toast.error(result.error)
-    else toast.success("Procedimento excluído")
-    setPage(1)
-    fetch(1)
+    if (result?.error) {
+      toast.error(result.error)
+      setPage(1)
+      fetch(1)
+    } else {
+      toast.success("Procedimento excluído")
+    }
   }
 
   const toggleSort = (col: typeof sortColumn) => {
@@ -229,15 +233,17 @@ export function ProceduresClient() {
     if (req.description) form.set("description", req.description)
     form.set("duration_minutes", String(req.duration_minutes))
     if (req.price != null) form.set("price", String(req.price))
+    setRequests(prev => prev.filter(r => r.id !== req.id))
     const result = await approveProcedureRequest(form)
-    if (result?.error) toast.error(result.error)
-    else {
-      toast.success(`Procedimento "${req.name}" aprovado!`)
+    if (result?.error) {
+      toast.error(result.error)
       getAllProcedureRequests().then((data) => setRequests(data as RequestRow[]))
+    } else {
+      toast.success(`Procedimento "${req.name}" aprovado!`)
+      setApproveConfirmId(null)
     }
     setActionLoading(false)
     setActionId(null)
-    setApproveConfirmId(null)
   }
 
   const handleReject = async () => {
@@ -247,13 +253,15 @@ export function ProceduresClient() {
     const form = new FormData()
     form.set("id", rejectId)
     form.set("rejection_reason", rejectReason)
+    setRequests(prev => prev.filter(r => r.id !== rejectId))
     const result = await rejectProcedureRequest(form)
-    if (result?.error) toast.error(result.error)
-    else {
+    if (result?.error) {
+      toast.error(result.error)
+      getAllProcedureRequests().then((data) => setRequests(data as RequestRow[]))
+    } else {
       toast.success("Solicitação rejeitada")
       setRejectOpen(false)
       setRejectReason("")
-      getAllProcedureRequests().then((data) => setRequests(data as RequestRow[]))
     }
     setActionLoading(false)
     setActionId(null)
@@ -401,8 +409,8 @@ export function ProceduresClient() {
                       {p.active ? "Ativo" : "Inativo"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
+                  <TableCell>
+                    <div className="flex justify-center gap-1">
                       <Button variant="ghost" size="icon" onClick={() => { setEdit(p); setOpen(true) }}>
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -559,8 +567,8 @@ export function ProceduresClient() {
                         <TableCell className="text-muted-foreground text-sm">
                           {new Date(r.created_at).toLocaleDateString("pt-BR")}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
+                        <TableCell>
+                          <div className="flex justify-center gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -693,10 +701,12 @@ export function ProceduresClient() {
                             ? new Date(r.reviewed_at).toLocaleDateString("pt-BR")
                             : "—"}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => setDetailRequest(r)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                        <TableCell>
+                          <div className="flex justify-center">
+                            <Button variant="ghost" size="icon" onClick={() => setDetailRequest(r)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

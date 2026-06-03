@@ -263,7 +263,6 @@ export function PacienteAnamneseClient({ pacienteId, appointmentId, sessionId }:
   }, [pacienteId])
 
   async function refresh() {
-    setLoading(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -427,15 +426,17 @@ export function PacienteAnamneseClient({ pacienteId, appointmentId, sessionId }:
 
   const handleDelete = async () => {
     if (!deleteSessionId) return
+    const targetId = deleteSessionId
     setDeleting(true)
-    const result = await deleteAnamneseSession(deleteSessionId)
+    setDeleteDialogOpen(false)
+    setDeleteSessionId(null)
+    setSessions(prev => prev.filter(s => s.id !== targetId))
+    const result = await deleteAnamneseSession(targetId)
     if (result?.error) {
       toast.error(result.error)
+      refresh()
     } else {
       toast.success("Sessão removida")
-      setDeleteDialogOpen(false)
-      setDeleteSessionId(null)
-      refresh()
     }
     setDeleting(false)
   }
@@ -650,9 +651,11 @@ export function PacienteAnamneseClient({ pacienteId, appointmentId, sessionId }:
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setViewAppointment(a)} title="Ver detalhes">
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex justify-center">
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setViewAppointment(a)} title="Ver detalhes">
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

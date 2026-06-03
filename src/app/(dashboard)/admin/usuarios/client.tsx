@@ -390,20 +390,18 @@ export function UsuariosClient() {
 
   const handleDelete = async (u: UserRow) => {
     setDeleting(true)
+    setDeletingUser(null)
     const form = new FormData()
     form.set("userId", u.id)
+    setUsers(prev => prev.filter(user => user.id !== u.id))
     const result = await deleteUser(form)
     if (result?.error) {
       toast.error(result.error)
-      setDeleting(false)
-      setDeletingUser(null)
+      fetch(page)
     } else {
       toast.success("Usuário excluído")
-      setDeleting(false)
-      setDeletingUser(null)
-      setLoading(true)
-      fetch(page)
     }
+    setDeleting(false)
   }
 
   const toggleSort = (col: typeof sortColumn) => {
@@ -555,7 +553,7 @@ export function UsuariosClient() {
                     {new Date(u.created_at).toLocaleDateString("pt-BR")}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
+                    <div className="flex justify-center gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -617,13 +615,13 @@ export function UsuariosClient() {
         user={editingUser}
         open={!!editingUser}
         onOpenChange={(v) => { if (!v) setEditingUser(null) }}
-        onSuccess={() => { setLoading(true); fetch(page) }}
+        onSuccess={() => { fetch(page) }}
       />
 
       <CriarUsuarioDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onSuccess={() => { setPage(1); setLoading(true); fetch(1) }}
+        onSuccess={() => { setPage(1); fetch(1) }}
       />
     </div>
   )
