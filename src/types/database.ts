@@ -598,7 +598,55 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      criar_usuario: {
+        Args: {
+          usuario_email: string
+          usuario_senha: string
+          usuario_nome: string
+          usuario_role: string
+          especialidade?: string | null
+        }
+        Returns: string
+      },
+      atualizar_usuario: {
+        Args: {
+          usuario_id: string
+          caller_id: string
+          usuario_nome: string
+          usuario_role: string
+          nova_senha: string | null
+          especialidade: string | null
+          novo_email: string
+        }
+        Returns: undefined
+      },
+      excluir_usuario: {
+        Args: {
+          usuario_id: string
+          caller_id: string
+        }
+        Returns: undefined
+      },
+      listar_usuarios: {
+        Args: {
+          page_size: number
+          page_num: number
+          caller_id: string
+        }
+        Returns: Array<{
+          id: string
+          name: string
+          email: string
+          role: string
+          dentist_id: string | null
+          created_at: string
+          total: number
+        }>
+      },
+      check_login_rate_limit: {
+        Args: { ip_address: string }
+        Returns: boolean
+      },
     }
     Enums: {
       [_ in never]: never

@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/supabase/guard"
 import { revalidatePath } from "next/cache"
 import { createUserSchema } from "@/lib/schemas"
 import { ok, err } from "@/lib/utils/action-response"
+import { translateMessage } from "@/lib/utils/translate-error"
 import { z } from "zod"
 
 export async function getUsers(page = 1, pageSize = 20) {
@@ -20,22 +21,14 @@ export async function getUsers(page = 1, pageSize = 20) {
       return { data: [], total: 0, error: "Acesso negado" }
     }
 
-    const { data: rpcData, error: rpcError } = await (supabase as any).rpc("listar_usuarios", {
+    const { data: rpcData, error: rpcError } = await supabase.rpc("listar_usuarios", {
       page_size: pageSize,
       page_num: page,
       caller_id: user.id,
     })
 
     if (!rpcError && rpcData) {
-      const rows = rpcData as Array<{
-        id: string
-        name: string
-        email: string
-        role: string
-        dentist_id: string | null
-        created_at: string
-        total: number
-      }>
+      const rows = rpcData
       return { data: rows, total: rows[0]?.total ?? 0 }
     }
 
@@ -54,7 +47,7 @@ export async function getUsers(page = 1, pageSize = 20) {
       .range(offset, offset + pageSize - 1)
 
     if (rowsError) {
-      return { data: [], total: 0, error: rowsError.message }
+      return { data: [], total: 0, error: translateMessage(rowsError.message) }
     }
 
     const data = (rows ?? []).map((p) => ({
@@ -69,7 +62,7 @@ export async function getUsers(page = 1, pageSize = 20) {
     return { data, total: countResult.count ?? 0 }
   } catch (e) {
     console.error("getUsers exception:", e)
-    return { data: [], total: 0, error: e instanceof Error ? e.message : String(e) }
+    return { data: [], total: 0, error: e instanceof Error ? translateMessage(e.message) : "Erro inesperado" }
   }
 }
 
@@ -81,7 +74,7 @@ export async function deleteUser(formData: FormData) {
     const parsed = z.object({ userId: z.string().uuid() }).safeParse(raw)
     if (!parsed.success) return err("ID de usuário inválido")
 
-    const { error } = await (supabase as any).rpc("excluir_usuario", {
+    const { error } = await supabase.rpc("excluir_usuario", {
       usuario_id: parsed.data.userId,
       caller_id: user.id,
     })
@@ -116,7 +109,7 @@ export async function updateUser(formData: FormData) {
 
     if (!parsed.success) return err(parsed.error.issues.map((e) => e.message).join(", "))
 
-    const { error } = await (supabase as any).rpc("atualizar_usuario", {
+    const { error } = await supabase.rpc("atualizar_usuario", {
       usuario_id: parsed.data.userId,
       caller_id: user.id,
       usuario_nome: parsed.data.name,
@@ -158,7 +151,7 @@ export async function createUser(formData: FormData) {
     const parsed = createUserSchema.safeParse(raw)
     if (!parsed.success) return err(parsed.error.issues.map((e) => e.message).join(", "))
 
-    const { data: userId, error } = await (supabase as any).rpc("criar_usuario", {
+    const { data: userId, error } = await supabase.rpc("criar_usuario", {
       usuario_email: parsed.data.email,
       usuario_senha: parsed.data.password,
       usuario_nome: parsed.data.name,

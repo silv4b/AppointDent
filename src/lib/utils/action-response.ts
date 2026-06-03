@@ -1,3 +1,5 @@
+import { translateMessage } from "./translate-error"
+
 export type ActionResult<T = void> = { data: T; error?: undefined } | { error: string; data?: undefined }
 
 export function ok<T>(data: T): ActionResult<T>
@@ -7,5 +9,5 @@ export function ok<T>(data?: T): ActionResult<T> {
 }
 
 export function err(message: string): { error: string } {
-  return { error: message }
+  return { error: translateMessage(message) }
 }
