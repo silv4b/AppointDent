@@ -395,6 +395,7 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          cro: string | null
           email: string | null
           id: string
           name: string
@@ -406,6 +407,7 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          cro?: string | null
           email?: string | null
           id?: string
           name: string
@@ -417,6 +419,7 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          cro?: string | null
           email?: string | null
           id?: string
           name?: string
@@ -589,6 +592,115 @@ export type Database = {
           id?: string
           name?: string
           role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      prescriptions: {
+        Row: {
+          id: string
+          patient_id: string
+          dentist_id: string
+          appointment_id: string | null
+          title: string
+          medications: Json
+          general_observations: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          patient_id: string
+          dentist_id: string
+          appointment_id?: string | null
+          title?: string
+          medications?: Json
+          general_observations?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          patient_id?: string
+          dentist_id?: string
+          appointment_id?: string | null
+          title?: string
+          medications?: Json
+          general_observations?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prescriptions_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescriptions_dentist_id_fkey"
+            columns: ["dentist_id"]
+            isOneToOne: false
+            referencedRelation: "dentists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescriptions_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clinic_settings: {
+        Row: {
+          id: string
+          name: string
+          street: string
+          number: string
+          neighborhood: string
+          city: string
+          state: string
+          email: string
+          phone1: string
+          phone2: string
+          cnpj: string
+          logo: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name?: string
+          street?: string
+          number?: string
+          neighborhood?: string
+          city?: string
+          state?: string
+          email?: string
+          phone1?: string
+          phone2?: string
+          cnpj?: string
+          logo?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          street?: string
+          number?: string
+          neighborhood?: string
+          city?: string
+          state?: string
+          email?: string
+          phone1?: string
+          phone2?: string
+          cnpj?: string
+          logo?: string | null
+          created_at?: string
           updated_at?: string
         }
         Relationships: []
