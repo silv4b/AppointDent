@@ -39,6 +39,7 @@ export async function createDentist(formData: FormData) {
   const { error } = await supabase.from("dentists").insert({
     name: parsed.data.name,
     specialty: parsed.data.specialty || null,
+    cro: parsed.data.cro || null,
     phone: parsed.data.phone || null,
     email: parsed.data.email || null,
   })
@@ -61,6 +62,7 @@ export async function updateDentist(formData: FormData) {
     .update({
       name: fields.name,
       specialty: fields.specialty || null,
+      cro: fields.cro || null,
       phone: fields.phone || null,
       email: fields.email || null,
       active: fields.active ?? true,

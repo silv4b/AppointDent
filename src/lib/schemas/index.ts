@@ -19,6 +19,7 @@ export const quickPatientSchema = z.object({
 export const dentistSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório").max(200),
   specialty: z.string().max(100).nullable().optional(),
+  cro: z.string().max(20).nullable().optional(),
   phone: z.string().max(20).nullable().optional(),
   email: z.string().max(200).nullable().optional(),
   active: z.boolean().optional(),
