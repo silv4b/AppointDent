@@ -92,13 +92,14 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
 
   const isDentist = role === "dentist"
   const isReceptionist = role === "receptionist"
+  const isAdmin = role === "admin"
 
   const navSections: NavSection[] = [
     {
       label: "Principal",
       items: [
         { href: "/", label: "Dashboard", icon: LayoutDashboard as typeof LayoutDashboard },
-        ...(isDentist
+        ...(isDentist || isAdmin
           ? [{ href: "/minha-agenda", label: "Minha Agenda", icon: Calendar as typeof LayoutDashboard }]
           : []
         ),
@@ -111,26 +112,26 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
         { href: "/confirmacao", label: "Confirmação", icon: CheckCircle as typeof LayoutDashboard },
         { href: "/historico", label: "Histórico de Agendamentos", icon: Clock as typeof LayoutDashboard },
         { href: "/prescricao", label: "Receituário", icon: FileText as typeof LayoutDashboard },
-        ...(isReceptionist ? [] : [{ href: "/anamnese", label: "Anamnese", icon: BookOpen as typeof LayoutDashboard }]),
-        ...(isDentist ? [
+        ...(isReceptionist && !isAdmin ? [] : [{ href: "/anamnese", label: "Anamnese", icon: BookOpen as typeof LayoutDashboard }]),
+        ...(isDentist || isAdmin ? [
           { href: "/minhas-anamneses", label: "Minhas Anamneses", icon: FileText as typeof LayoutDashboard },
           { href: "/meus-procedimentos", label: "Meus Procedimentos", icon: Syringe as typeof LayoutDashboard },
         ] : []),
       ],
     },
-    ...(isDentist ? [] : [{
+    ...(isDentist && !isAdmin ? [] : [{
       label: "Cadastros",
       items: [
         { href: "/pacientes", label: "Pacientes", icon: Users as typeof LayoutDashboard },
         { href: "/dentistas", label: "Dentistas", icon: Stethoscope as typeof LayoutDashboard },
-        ...(isReceptionist ? [] : [{ href: "/procedimentos", label: "Procedimentos", icon: Syringe as typeof LayoutDashboard }]),
+        ...(isReceptionist && !isAdmin ? [] : [{ href: "/procedimentos", label: "Procedimentos", icon: Syringe as typeof LayoutDashboard }]),
       ],
     }] as NavSection[]),
-    ...(isDentist ? [] : [{
+    ...(isDentist && !isAdmin ? [] : [{
       label: "Configurações",
       items: [
         { href: "/horarios", label: "Grade de Horários", icon: Clock as typeof LayoutDashboard },
-        ...(isReceptionist ? [] : [
+        ...(isReceptionist && !isAdmin ? [] : [
           { href: "/admin/usuarios", label: "Usuários", icon: Shield as typeof LayoutDashboard },
           { href: "/admin/solicitacoes", label: "Solicitações", icon: ClipboardList as typeof LayoutDashboard },
         ]),
@@ -155,7 +156,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
         <Icon className="h-4 w-4 shrink-0" />
         <span className={cn(
           "truncate transition-all duration-300",
-          collapsed ? "w-0 opacity-0 overflow-hidden" : "w-auto opacity-100",
+          collapsed && !mobileOpen ? "w-0 opacity-0 overflow-hidden" : "w-auto opacity-100",
         )}>{label}</span>
       </Link>
     )
@@ -288,7 +289,7 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: SidebarProps) {
       <aside
         className={cn(
           "fixed left-0 top-0 z-50 flex h-full flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300",
-          collapsed ? "w-16" : "w-62",
+          collapsed && !mobileOpen ? "w-16" : "w-[17rem]",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >

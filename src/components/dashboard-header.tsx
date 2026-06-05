@@ -4,16 +4,15 @@ import { Button } from "@/components/ui/button"
 import { useSupabase } from "@/components/providers/supabase-provider"
 import { useTheme } from "next-themes"
 import Link from "next/link"
-import { Bell, Menu, Moon, PanelLeftClose, PanelLeftOpen, Plus, Search, Sun } from "lucide-react"
+import { Bell, Moon, PanelLeftClose, PanelLeftOpen, Sun } from "lucide-react"
 import { useEffect, useState } from "react"
 
 interface DashboardHeaderProps {
-  onMenuToggle?: () => void
   collapsed?: boolean
   onToggleCollapse?: () => void
 }
 
-export function DashboardHeader({ onMenuToggle, collapsed, onToggleCollapse }: DashboardHeaderProps) {
+export function DashboardHeader({ collapsed, onToggleCollapse }: DashboardHeaderProps) {
   const { user } = useSupabase()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -42,17 +41,11 @@ export function DashboardHeader({ onMenuToggle, collapsed, onToggleCollapse }: D
         {/* Left side */}
         <div className="flex items-center gap-3">
           <button
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="hidden lg:flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
             onClick={() => onToggleCollapse?.()}
             title={collapsed ? "Expandir sidebar" : "Retrair sidebar"}
           >
             {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          </button>
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
-            onClick={() => onMenuToggle?.()}
-          >
-            <Menu className="h-4 w-4" />
           </button>
         </div>
 
