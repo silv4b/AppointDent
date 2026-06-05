@@ -37,6 +37,7 @@ import {
   updateAppointment,
 } from "@/lib/actions/appointments"
 import { quickCreatePatient } from "@/lib/actions/patients"
+import { NULL_UUID } from "@/lib/utils/constants"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
@@ -171,6 +172,13 @@ function toDateTimeLocal(d: Date): string {
   const hh = String(d.getHours()).padStart(2, "0")
   const mm = String(d.getMinutes()).padStart(2, "0")
   return `${y}-${m}-${day}T${hh}:${mm}`
+}
+
+function appendTimezone(val: string): string {
+  const offset = -new Date().getTimezoneOffset()
+  const sign = offset >= 0 ? "+" : "-"
+  const tz = `${sign}${String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0")}:${String(Math.abs(offset) % 60).padStart(2, "0")}`
+  return `${val}${tz}`
 }
 
 // ============================================================
@@ -561,6 +569,15 @@ function AppointmentDialog({
             setSaving(true)
             setError(null)
             const form = new FormData(e.currentTarget)
+            ;["start_time", "end_time"].forEach((name) => {
+              const val = form.get(name) as string | null
+              if (val && !val.includes("+") && !val.includes("-")) {
+                const offset = -new Date().getTimezoneOffset()
+                const sign = offset >= 0 ? "+" : "-"
+                const tz = `${sign}${String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0")}:${String(Math.abs(offset) % 60).padStart(2, "0")}`
+                form.set(name, `${val}${tz}`)
+              }
+            })
             const result = await onSave(form)
             if (result?.error) setError(result.error)
             else onOpenChange(false)
@@ -895,7 +912,7 @@ export function AgendaClient() {
       if (receptionistDentistIds.length > 0) {
         query = query.in("dentist_id", receptionistDentistIds)
       } else {
-        query = query.eq("dentist_id", "00000000-0000-0000-0000-000000000000")
+        query = query.eq("dentist_id", NULL_UUID)
       }
     }
 
@@ -1073,8 +1090,8 @@ export function AgendaClient() {
     form.set("patient_id", appt.patient_id)
     form.set("dentist_id", appt.dentist_id)
     form.set("procedure_id", appt.procedure_id ?? "")
-    form.set("start_time", toDateTimeLocal(new Date(start)))
-    form.set("end_time", toDateTimeLocal(new Date(end)))
+    form.set("start_time", appendTimezone(toDateTimeLocal(new Date(start))))
+    form.set("end_time", appendTimezone(toDateTimeLocal(new Date(end))))
     form.set("notes", appt.notes ?? "")
     form.set("status", appt.status)
     return form
@@ -1156,7 +1173,7 @@ export function AgendaClient() {
 
     const dayHours = clinicHours.find((h) => h.day_of_week === dayOfWeek)
     if (!dayHours || !dayHours.is_open) {
-      return { style: { backgroundColor: "#f0f0f0" } as React.CSSProperties }
+      return { style: { backgroundColor: "var(--muted)" } as React.CSSProperties }
     }
 
     const slotMinutes = hour * 60 + minute
@@ -1166,7 +1183,7 @@ export function AgendaClient() {
     const closeMinutes = closeParts[0] * 60 + closeParts[1]
 
     if (slotMinutes < openMinutes || slotMinutes >= closeMinutes) {
-      return { style: { backgroundColor: "#f0f0f0" } as React.CSSProperties }
+      return { style: { backgroundColor: "var(--muted)" } as React.CSSProperties }
     }
 
     return {}
@@ -1233,7 +1250,7 @@ export function AgendaClient() {
   }, [appointments, currentDate, selectedDentist])
 
   return (
-    <div className="flex gap-4">
+    <div className="flex gap-6">
       <div className="min-w-0 flex-1">
         <div className="mb-4 flex flex-wrap items-stretch justify-between gap-3">
           <div className="inline-flex rounded-lg border bg-background p-0.5">

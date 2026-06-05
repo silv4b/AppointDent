@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { CalendarDays, DollarSign, Eye, Stethoscope, Syringe, TrendingDown, TrendingUp, Users } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { NULL_UUID } from "@/lib/utils/constants"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
@@ -105,8 +106,8 @@ export function DashboardClient() {
         apptsQuery = apptsQuery.in("dentist_id", receptionistDentistIds)
         recentQuery = recentQuery.in("dentist_id", receptionistDentistIds)
       } else {
-        apptsQuery = apptsQuery.eq("dentist_id", "00000000-0000-0000-0000-000000000000")
-        recentQuery = recentQuery.eq("dentist_id", "00000000-0000-0000-0000-000000000000")
+        apptsQuery = apptsQuery.eq("dentist_id", NULL_UUID)
+        recentQuery = recentQuery.eq("dentist_id", NULL_UUID)
       }
     }
 

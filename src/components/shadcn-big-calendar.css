@@ -392,7 +392,7 @@ button.rbc-input::-moz-focus-inner {
   flex: 1;
 }
 .rbc-timeslot-group {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid color-mix(in oklab, var(--muted-foreground) 40%, transparent);
   min-height: 40px;
   display: -webkit-flex;
   display: -ms-flexbox;
@@ -458,7 +458,7 @@ button.rbc-input::-moz-focus-inner {
   min-height: 1em;
 }
 .rbc-day-slot .rbc-time-slot {
-  border-top: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--muted-foreground) 25%, transparent);
 }
 .rbc-time-slot {
   -webkit-flex: 1 0 0;
@@ -623,3 +623,4 @@ button.rbc-input::-moz-focus-inner {
   align-items: center;
   justify-content: center;
 }
+
