@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf"
+import { wrap } from "@/lib/utils/pdf-helpers"
 
 interface ExportField {
   label: string
@@ -30,27 +31,10 @@ function stripHtml(html: string): string {
     .trim()
 }
 
-function wrap(text: string, maxWidth: number, doc: jsPDF): string[] {
-  const lines: string[] = []
-  const words = text.split(" ")
-  let line = ""
-  for (const word of words) {
-    const test = line ? line + " " + word : word
-    if (doc.getTextWidth(test) > maxWidth && line) {
-      lines.push(line)
-      line = word
-    } else {
-      line = test
-    }
-  }
-  if (line) lines.push(line)
-  return lines
-}
-
 export function generateAnamnesePdf(data: ExportData): void {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
-  const margin = 20
+  const margin = 22
   const maxWidth = pageWidth - margin * 2
   let y = margin
 

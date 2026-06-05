@@ -1,4 +1,6 @@
 import { jsPDF } from "jspdf"
+import { maskPhone, maskCnpj } from "@/lib/utils/masks"
+import { wrap } from "@/lib/utils/pdf-helpers"
 
 interface MedicationExport {
   medicamento: string
@@ -68,40 +70,6 @@ function parseHtml(html: string): HtmlSegment[] {
   }
 
   return segments
-}
-
-
-function maskPhone(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 11)
-  if (digits.length <= 2) return `(${digits}`
-  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
-}
-
-function maskCnpj(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 14)
-  if (digits.length <= 2) return digits
-  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`
-  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`
-  if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`
-  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
-}
-
-function wrap(text: string, maxWidth: number, doc: jsPDF): string[] {
-  const lines: string[] = []
-  const words = text.split(" ")
-  let line = ""
-  for (const word of words) {
-    const test = line ? line + " " + word : word
-    if (doc.getTextWidth(test) > maxWidth && line) {
-      lines.push(line)
-      line = word
-    } else {
-      line = test
-    }
-  }
-  if (line) lines.push(line)
-  return lines
 }
 
 export function generatePrescriptionPdf(data: PrescriptionExportData): jsPDF {
