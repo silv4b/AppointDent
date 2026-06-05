@@ -215,10 +215,14 @@ src/
 │   │   ├── historico/             # Histórico de pacientes
 │   │   │   └── [pacienteId]/      # Detalhes + anamneses vinculadas
 │   │   ├── anamnese/[pacienteId]/ # Anamnese digital inline
+│   │   ├── prescricao/            # Listagem de prescrições
+│   │   │   └── [id]/              # Criar/editar prescrição
+│   │   ├── perfil/                # Perfil do usuário + dados da clínica
 │   │   ├── minha-agenda/          # Visão do dentista logado
 │   │   ├── minhas-anamneses/      # Modelos de anamnese do dentista
 │   │   ├── meus-procedimentos/    # Solicitações de procedimento
-│   │   └── admin/usuarios/        # Admin: gerenciar contas
+│   │   ├── admin/usuarios/        # Admin: gerenciar contas
+│   │   └── admin/solicitacoes/    # Admin: aprovar procedimentos
 │   ├── login/                     # Página de login
 │   ├── auth/callback/             # Callback OAuth
 │   ├── layout.tsx                 # Layout raiz
@@ -232,6 +236,10 @@ src/
 │   ├── sidebar.tsx                # Sidebar de navegação
 │   ├── data-table-pagination.tsx  # Paginação reutilizável
 │   ├── rich-text-editor.tsx       # Editor Tiptap
+│   ├── dynamic-card.tsx           # Card com campos configuráveis
+│   ├── dynamic-field.tsx          # Campo reutilizável (texto/richtext)
+│   ├── crop-dialog.tsx            # Crop de imagem (logo)
+│   ├── mini-calendar.tsx          # Mini-calendário da sidebar
 │   └── dashboard-header.tsx       # Cabeçalho com info do usuário
 ├── hooks/
 │   ├── use-local-storage.ts       # Hook SSR-safe (c/ função updater)
@@ -252,13 +260,19 @@ src/
 │   │   ├── anamnesis-templates.ts # Modelos de anamnese
 │   │   ├── procedure-requests.ts  # Solicitações de procedimento
 │   │   ├── dentist-procedures.ts  # Vínculo dentista-procedimento
-│   │   ├── admin.ts               # Admin: criar/listar usuários
-│   │   └── notifications.ts       # Notificações
+│   │   ├── prescriptions.ts       # CRUD prescrições
+│   │   ├── clinic-settings.ts     # Dados da clínica (logo, endereço)
+│   │   └── admin.ts               # Admin: criar/listar usuários
 │   ├── schemas/
-│   │   └── index.ts               # Schemas zod
+│   │   ├── index.ts               # Schemas zod (geral)
+│   │   └── prescriptions.ts       # Schemas zod (prescrições)
 │   └── utils/
 │       ├── action-response.ts     # ActionResult<T>, ok(), err()
-│       └── export-anamnese-pdf.ts # Geração de PDF
+│       ├── constants.ts           # Constantes (NULL_UUID)
+│       ├── masks.ts               # Máscaras (telefone, CNPJ)
+│       ├── pdf-helpers.ts         # Helpers compartilhados de PDF
+│       ├── export-anamnese-pdf.ts # Geração de PDF (anamnese)
+│       └── export-prescription-pdf.ts # Geração de PDF (prescrição)
 ├── types/
 │   └── database.ts                # Tipos gerados do Supabase
 │   └── react-big-calendar-override.d.ts  # Type decl para 3-day view
@@ -285,7 +299,18 @@ supabase/
 │   ├── 00016_fix_handle_new_user.sql
 │   ├── 00017_update_handle_new_user.sql
 │   ├── 00018_dashboard_stats.sql
-│   └── 00019_add_patient_email.sql
+│   ├── 00019_add_patient_email.sql
+│   ├── 00020_prescriptions.sql
+│   ├── 00021_clinic_settings.sql
+│   ├── 00022_profile_avatar.sql
+│   ├── 00023_appointment_patient_name.sql
+│   ├── 00024_dentist_procedures_status.sql
+│   ├── 00025_minha_agenda_view.sql
+│   ├── 00026_procedure_requests_status.sql
+│   ├── 00027_blocked_slot_check.sql
+│   ├── 00028_update_anamnese_rls.sql
+│   ├── 00029_prescription_rls.sql
+│   └── 00030_availability_slots_rls.sql
 ├── config.toml
 ├── seed.sql
 ├── criar-admin.sql                # Função para criar admin em produção
