@@ -19,7 +19,7 @@ export async function getMyAnamnesisTemplates() {
 
     const { data } = await supabase
       .from("anamnesis_templates")
-      .select("*")
+      .select("id, dentist_id, name, fields, created_at")
       .eq("dentist_id", dentist.id)
       .order("created_at", { ascending: false })
 

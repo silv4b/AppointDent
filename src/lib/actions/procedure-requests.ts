@@ -36,7 +36,7 @@ export async function getPendingProcedureRequests() {
     const { data } = await supabase
       .from("procedure_requests")
       .select(`
-        *,
+        id, dentist_id, admin_id, name, description, duration_minutes, price, status, created_at, reviewed_at, rejection_reason,
         dentist:dentist_id (
           id,
           name
@@ -55,7 +55,7 @@ export async function getMyProcedureRequests(dentistId: string) {
     const { supabase } = await requireAuth()
     const { data } = await supabase
       .from("procedure_requests")
-      .select("*")
+      .select("id, dentist_id, admin_id, name, description, duration_minutes, price, status, created_at, reviewed_at, rejection_reason")
       .eq("dentist_id", dentistId)
       .order("created_at", { ascending: false })
     return ok(data ?? [])
@@ -67,6 +67,14 @@ export async function getMyProcedureRequests(dentistId: string) {
 export async function approveProcedureRequest(formData: FormData) {
   try {
     const { supabase, user } = await requireAuth()
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profile?.role !== "admin") return err("Acesso negado")
 
     const raw = Object.fromEntries(formData)
     const parsed = z.object({
@@ -128,7 +136,7 @@ export async function getAllProcedureRequests() {
     const { data } = await supabase
       .from("procedure_requests")
       .select(`
-        *,
+        id, dentist_id, admin_id, name, description, duration_minutes, price, status, created_at, reviewed_at, rejection_reason,
         dentist:dentist_id (
           id,
           name
@@ -139,7 +147,7 @@ export async function getAllProcedureRequests() {
     const requests = data ?? []
 
     const adminIds = requests
-      .map((r: any) => r.admin_id)
+      .map((r) => r.admin_id)
       .filter((id: string | null): id is string => id !== null)
 
     if (adminIds.length > 0) {
@@ -150,7 +158,7 @@ export async function getAllProcedureRequests() {
 
       const adminMap = new Map(admins?.map((a) => [a.id, a.name]) ?? [])
 
-      return ok((requests as any[]).map((r) => ({
+      return ok(requests.map((r) => ({
         ...r,
         admin: r.admin_id ? { id: r.admin_id, name: adminMap.get(r.admin_id) ?? null } : null,
       })))
@@ -165,6 +173,14 @@ export async function getAllProcedureRequests() {
 export async function rejectProcedureRequest(formData: FormData) {
   try {
     const { supabase, user } = await requireAuth()
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profile?.role !== "admin") return err("Acesso negado")
 
     const raw = Object.fromEntries(formData)
     const parsed = z.object({

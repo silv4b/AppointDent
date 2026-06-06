@@ -25,7 +25,7 @@ export async function getClinicSettings() {
 
     const { data, error } = await supabase
       .from("clinic_settings")
-      .select("*")
+      .select("id, name, street, number, neighborhood, city, state, email, phone1, phone2, cnpj, logo")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()

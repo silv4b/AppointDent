@@ -18,7 +18,7 @@ export async function getPrescriptions(page: number, pageSize: number, search?: 
 
     let query = supabase
       .from("prescriptions")
-      .select("*, patients(name), dentists(name)", { count: "exact" })
+      .select("id, title, created_at, patients(name), dentists(name)", { count: "exact" })
       .order("created_at", { ascending: false })
 
     if (dentistFilter !== null) {
@@ -48,7 +48,7 @@ export async function getPrescription(id: string) {
 
     const { data, error } = await supabase
       .from("prescriptions")
-      .select("*, patients(name, phone), dentists(name, specialty, cro)")
+      .select("id, title, patient_id, dentist_id, appointment_id, medications, general_observations, created_at, updated_at, patients(name, phone), dentists(name, specialty, cro)")
       .eq("id", id)
       .single()
 

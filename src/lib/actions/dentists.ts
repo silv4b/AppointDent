@@ -11,7 +11,7 @@ export async function getDentists() {
   try {
     const { supabase } = await requireAuth()
 
-    let query = supabase.from("dentists").select("*").order("name")
+    let query = supabase.from("dentists").select("id, name, specialty, cro, phone, email, active, created_at").order("name")
 
     const dentistFilter = await getUserDentistFilter()
     if (dentistFilter !== null) {
@@ -84,10 +84,18 @@ export async function updateDentist(formData: FormData) {
 
 export async function deleteDentist(formData: FormData) {
   try {
-    const { supabase } = await requireAuth()
+    const { supabase, user } = await requireAuth()
     const raw = Object.fromEntries(formData)
     const parsed = z.object({ id: z.string().uuid() }).safeParse(raw)
     if (!parsed.success) return err(parsed.error.issues.map((e) => e.message).join(", "))
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profile?.role !== "admin") return err("Acesso negado")
 
     const { error } = await supabase.from("dentists").delete().eq("id", parsed.data.id)
     if (error) return err(error.message)

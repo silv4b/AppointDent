@@ -82,8 +82,8 @@ export const createUserSchema = z.object({
     .regex(/[0-9]/, "Senha deve conter pelo menos um número"),
   confirmPassword: z.string().min(1, "Confirme a senha"),
   role: z.enum(["admin", "dentist", "receptionist"], {
-    errorMap: () => ({ message: "Selecione uma função" }),
-  } as any),
+    error: "Selecione uma função",
+  }),
   specialty: z.string().max(100).optional().nullable(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Senhas não conferem",
