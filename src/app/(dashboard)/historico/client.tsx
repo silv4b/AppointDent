@@ -120,7 +120,9 @@ export function HistoricoClient() {
                 onValueChange={(v) => { if (v) { setFilterDentist(v); setPage(1); setLoading(true) } }}
               >
                 <SelectTrigger className="h-9 w-44">
-                  <SelectValue placeholder="Todos os dentistas" />
+                  <SelectValue placeholder="Todos os dentistas">
+                    {(v: string) => v === "all" ? "Todos os dentistas" : dentists.find((d) => d.id === v)?.name ?? v}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os dentistas</SelectItem>
