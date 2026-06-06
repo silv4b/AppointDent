@@ -2,9 +2,11 @@
 
 import { useSupabase } from "@/components/providers/supabase-provider"
 import { getUserSessionData } from "@/lib/actions/session"
+import { updateProfileName, updateProfileEmail, updateProfilePassword } from "@/lib/actions/profile"
 import { useCallback, useEffect, useState } from "react"
-import { Building2, Loader2, Mail, User, BadgeInfo, Upload } from "lucide-react"
+import { Building2, Loader2, User, BadgeInfo, Upload, Eye, EyeOff, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { DynamicField } from "@/components/dynamic-field"
 import { toast } from "sonner"
 import { getClinicSettings, saveClinicSettings } from "@/lib/actions/clinic-settings"
@@ -21,10 +23,64 @@ const ROLE_LABEL: Record<string, string> = {
 
 type ClinicData = Database["public"]["Tables"]["clinic_settings"]["Row"]
 
+function validatePassword(password: string): string | null {
+  if (password.length < 8) return "Mínimo de 8 caracteres"
+  if (!/[A-Z]/.test(password)) return "Falta letra maiúscula"
+  if (!/[a-z]/.test(password)) return "Falta letra minúscula"
+  if (!/[0-9]/.test(password)) return "Falta número"
+  if (!/[!@#$%^&*(),.?":{}|<>_\-]/.test(password)) return "Falta caractere especial"
+  return null
+}
+
+function PasswordStrength({ password }: { password: string }) {
+  if (!password) return null
+  const checks = [
+    { label: "8+ caracteres", pass: password.length >= 8 },
+    { label: "Maiúscula", pass: /[A-Z]/.test(password) },
+    { label: "Minúscula", pass: /[a-z]/.test(password) },
+    { label: "Número", pass: /[0-9]/.test(password) },
+    { label: "Especial", pass: /[!@#$%^&*(),.?":{}|<>_\-]/.test(password) },
+  ]
+  const passed = checks.filter((c) => c.pass).length
+  const strength = passed <= 2 ? "Fraca" : passed <= 3 ? "Média" : "Forte"
+  const colors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-lime-500", "bg-green-500"]
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex gap-1">
+        {checks.map((_, i) => (
+          <div key={i} className={`h-1 flex-1 rounded-full ${i < passed ? colors[i] : "bg-muted"}`} />
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Senha {strength}
+      </p>
+      <ul className="space-y-0.5">
+        {checks.map((c) => (
+          <li key={c.label} className={`flex items-center gap-1.5 text-xs ${c.pass ? "text-green-600" : "text-muted-foreground"}`}>
+            {c.pass ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+            {c.label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function PerfilClient() {
   const { user } = useSupabase()
   const [role, setRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const [editName, setEditName] = useState("")
+  const [editEmail, setEditEmail] = useState("")
+  const [savingName, setSavingName] = useState(false)
+  const [savingEmail, setSavingEmail] = useState(false)
+
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
 
   const [, setClinic] = useState<ClinicData | null>(null)
   const [clinicId, setClinicId] = useState("")
@@ -51,6 +107,14 @@ export function PerfilClient() {
   }, [user])
 
   useEffect(() => {
+    if (!user) return
+    const name = user.user_metadata?.name as string | undefined
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (name) setEditName(name)
+    if (user.email) setEditEmail(user.email)
+  }, [user])
+
+  useEffect(() => {
     if (role !== "admin") return
     getClinicSettings().then((result) => {
       if ("data" in result && result.data) {
@@ -71,6 +135,49 @@ export function PerfilClient() {
       }
     })
   }, [role])
+
+  const handleSaveName = async () => {
+    const trimmed = editName.trim()
+    if (!trimmed) { toast.error("O nome não pode ficar vazio"); return }
+    setSavingName(true)
+    const result = await updateProfileName(trimmed)
+    if ("error" in result) {
+      toast.error(result.error)
+    } else {
+      toast.success("Nome atualizado!")
+    }
+    setSavingName(false)
+  }
+
+  const handleSaveEmail = async () => {
+    const trimmed = editEmail.trim()
+    if (!trimmed) { toast.error("O email não pode ficar vazio"); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) { toast.error("Email inválido"); return }
+    setSavingEmail(true)
+    const result = await updateProfileEmail(trimmed)
+    if ("error" in result) {
+      toast.error(result.error)
+    } else {
+      toast.success("Email de confirmação enviado! Verifique sua caixa de entrada.")
+    }
+    setSavingEmail(false)
+  }
+
+  const handleSavePassword = async () => {
+    const error = validatePassword(newPassword)
+    if (error) { toast.error(`Senha inválida: ${error}`); return }
+    if (newPassword !== confirmPassword) { toast.error("As senhas não conferem"); return }
+    setSavingPassword(true)
+    const result = await updateProfilePassword(newPassword)
+    if ("error" in result) {
+      toast.error(result.error)
+    } else {
+      toast.success("Senha atualizada com sucesso!")
+      setNewPassword("")
+      setConfirmPassword("")
+    }
+    setSavingPassword(false)
+  }
 
   const handleSaveClinic = useCallback(async () => {
     setSavingClinic(true)
@@ -104,8 +211,14 @@ export function PerfilClient() {
     )
   }
 
-  const name = user?.user_metadata?.name as string | undefined
-  const email = user?.email ?? "—"
+  const initials = user?.user_metadata?.name
+    ? (user.user_metadata.name as string).split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : (user?.email?.[0]?.toUpperCase() ?? "?")
+
+  const displayName = user?.user_metadata?.name as string | undefined
+  const userEmail = user?.email ?? "—"
+  const passwordError = newPassword ? validatePassword(newPassword) : null
+  const passwordsMatch = newPassword === confirmPassword
 
   return (
     <div>
@@ -117,39 +230,93 @@ export function PerfilClient() {
       <div className="rounded-lg border bg-card">
         <div className="flex flex-col items-center gap-4 border-b px-6 py-10">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-3xl font-bold text-primary">
-            {name
-              ? name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-              : email[0].toUpperCase()}
+            {initials}
           </div>
           <div className="text-center">
-            <h2 className="text-xl font-semibold">{name ?? "Usuário"}</h2>
-            <p className="text-sm text-muted-foreground">{email}</p>
+            <h2 className="text-xl font-semibold">{displayName ?? "Usuário"}</h2>
+            <p className="text-sm text-muted-foreground">{userEmail}</p>
           </div>
         </div>
 
         <div className="divide-y px-6">
-          <div className="flex items-center gap-4 py-4">
-            <User className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Nome</p>
-              <p className="text-sm font-medium">{name ?? "—"}</p>
+          <div className="py-4">
+            <p className="text-xs text-muted-foreground mb-1.5">Nome</p>
+            <div className="flex gap-2">
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Seu nome" />
+              <Button size="sm" onClick={handleSaveName} disabled={savingName || editName === (displayName ?? "")}>
+                {savingName ? "Salvando..." : "Salvar"}
+              </Button>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 py-4">
-            <Mail className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Email</p>
-              <p className="text-sm font-medium">{email}</p>
+          <div className="py-4">
+            <p className="text-xs text-muted-foreground mb-1.5">Email</p>
+            <div className="flex gap-2">
+              <Input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="seu@email.com" />
+              <Button size="sm" onClick={handleSaveEmail} disabled={savingEmail || editEmail === (user?.email ?? "")}>
+                {savingEmail ? "Salvando..." : "Salvar"}
+              </Button>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Um link de confirmação será enviado para o novo email.
+            </p>
           </div>
 
           <div className="flex items-center gap-4 py-4">
-            <BadgeInfo className="h-5 w-5 text-muted-foreground" />
+            <BadgeInfo className="h-5 w-5 text-muted-foreground shrink-0" />
             <div>
               <p className="text-xs text-muted-foreground">Função</p>
               <p className="text-sm font-medium">{ROLE_LABEL[role ?? ""] ?? role ?? "—"}</p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-lg border bg-card">
+        <div className="border-b px-4 py-3 flex items-center gap-2">
+          <User className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">Alterar Senha</h2>
+        </div>
+        <div className="p-4 space-y-4">
+          <div className="relative">
+            <Input
+              type={showPassword ? "text" : "password"}
+              placeholder="Nova senha"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowPassword(!showPassword)}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+
+          <Input
+            type="password"
+            placeholder="Confirmar nova senha"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+
+          {newPassword && (
+            <PasswordStrength password={newPassword} />
+          )}
+
+          {confirmPassword && newPassword !== confirmPassword && (
+            <p className="text-xs text-destructive">As senhas não conferem</p>
+          )}
+
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSavePassword}
+              disabled={savingPassword || !newPassword || !!passwordError || !passwordsMatch}
+            >
+              {savingPassword ? "Salvando..." : "Salvar Senha"}
+            </Button>
           </div>
         </div>
       </div>
