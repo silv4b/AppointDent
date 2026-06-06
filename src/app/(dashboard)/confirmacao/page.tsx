@@ -1,8 +1,6 @@
 import { ConfirmacaoClient } from "./client"
 
-export const metadata = {
-  title: "Confirmação de Agendamentos | AppointDent",
-}
+export const metadata = { title: "Confirmação de Agendamentos" }
 
 export default function ConfirmacaoPage() {
   return <ConfirmacaoClient />

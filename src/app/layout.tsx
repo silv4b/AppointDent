@@ -14,8 +14,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 })
 
-export const metadata: Metadata = {
-  title: "AppointDent",
+export const metadata = {
+  title: {
+    template: "%s | AppointDent",
+    default: "AppointDent",
+  },
   description: "Agendamento odontológico inteligente",
   icons: {
     icon: ["/assets/tooth-icon.ico", "/assets/tooth-icon.png"],

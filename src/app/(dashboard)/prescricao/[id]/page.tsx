@@ -1,5 +1,7 @@
 import { PrescricaoFormClient } from "./client"
 
+export const metadata = { title: "Receituário" }
+
 export default async function PrescricaoFormPage({
   params,
   searchParams,

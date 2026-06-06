@@ -1,5 +1,7 @@
 import { PacienteAnamneseClient } from "./client"
 
+export const metadata = { title: "Anamnese" }
+
 export default async function PacienteAnamnesePage({
   params,
   searchParams,
