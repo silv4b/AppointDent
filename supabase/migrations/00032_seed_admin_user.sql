@@ -16,7 +16,7 @@ BEGIN
   -- Só cria se ainda não existir
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = v_email) THEN
     -- 1. Criar usuário em auth.users
-    INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, email_change, email_change_token_new, email_change_token_current)
+    INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token, email_change, email_change_token_new, email_change_token_current, reauthentication_token, is_sso_user, is_anonymous)
     VALUES (
       '00000000-0000-0000-0000-000000000000',
       gen_random_uuid(),
@@ -29,7 +29,8 @@ BEGIN
       jsonb_build_object('name', 'Administrador'),
       now(),
       now(),
-      '', '', '', ''
+      '', '', '', '', '', '',
+      false, false
     )
     RETURNING id INTO v_user_id;
 
