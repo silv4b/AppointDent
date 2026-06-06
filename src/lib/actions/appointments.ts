@@ -19,7 +19,7 @@ export async function getAppointments(date: string) {
 
     let query = supabase
       .from("appointments")
-      .select("*, patients(name), dentists(name), procedures(name, color, duration_minutes)")
+      .select("id, patient_id, dentist_id, procedure_id, start_time, end_time, status, notes, created_at, updated_at, return_to_id, patients(name), dentists(name), procedures(name, color, duration_minutes)")
       .gte("start_time", dayStart)
       .lte("start_time", dayEnd)
       .order("start_time")
@@ -48,7 +48,7 @@ export async function getPendingAppointments() {
 
     let query = supabase
       .from("appointments")
-      .select("*, patients(name), dentists(name), procedures(name, color, duration_minutes)")
+      .select("id, patient_id, dentist_id, procedure_id, start_time, end_time, status, notes, created_at, updated_at, return_to_id, patients(name), dentists(name), procedures(name, color, duration_minutes)")
       .eq("status", "pending")
       .order("start_time")
 
@@ -142,7 +142,7 @@ async function checkClinicHours(
 
   const { data } = await supabase
     .from("clinic_hours")
-    .select("*")
+    .select("open_time, close_time, is_open")
     .eq("day_of_week", dayOfWeek)
     .single()
 
@@ -182,7 +182,7 @@ export async function searchAppointmentsForReturn(params: {
 
     let query = supabase
       .from("appointments")
-      .select("*, patients!inner(name), dentists!inner(name), procedures(name, color, duration_minutes)")
+      .select("id, patient_id, dentist_id, procedure_id, start_time, end_time, status, notes, created_at, updated_at, return_to_id, patients!inner(name), dentists!inner(name), procedures(name, color, duration_minutes)")
       .gte("start_time", startOfMonth)
       .lte("start_time", endOfMonth)
       .order("start_time")
@@ -286,7 +286,22 @@ export async function createAppointment(formData: FormData) {
 
 export async function confirmAppointment(id: string) {
   try {
-    const { supabase } = await requireAuth()
+    const { supabase, user } = await requireAuth()
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profile?.role !== "admin") {
+      const { data: dent } = await supabase
+        .from("dentists")
+        .select("id")
+        .eq("profile_id", user.id)
+        .single()
+      if (!dent) return err("Acesso negado")
+    }
 
     const { error } = await supabase
       .from("appointments")
@@ -304,7 +319,22 @@ export async function confirmAppointment(id: string) {
 
 export async function rejectAppointment(id: string) {
   try {
-    const { supabase } = await requireAuth()
+    const { supabase, user } = await requireAuth()
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profile?.role !== "admin") {
+      const { data: dent } = await supabase
+        .from("dentists")
+        .select("id")
+        .eq("profile_id", user.id)
+        .single()
+      if (!dent) return err("Acesso negado")
+    }
 
     const { error } = await supabase
       .from("appointments")
@@ -322,7 +352,22 @@ export async function rejectAppointment(id: string) {
 
 export async function updateAppointment(formData: FormData) {
   try {
-    const { supabase } = await requireAuth()
+    const { supabase, user } = await requireAuth()
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profile?.role !== "admin") {
+      const { data: dent } = await supabase
+        .from("dentists")
+        .select("id")
+        .eq("profile_id", user.id)
+        .single()
+      if (!dent) return err("Acesso negado")
+    }
 
     const raw = Object.fromEntries(formData)
     const parsed = appointmentUpdateSchema.safeParse(raw)
@@ -366,10 +411,32 @@ export async function updateAppointment(formData: FormData) {
 
 export async function deleteAppointment(formData: FormData) {
   try {
-    const { supabase } = await requireAuth()
+    const { supabase, user } = await requireAuth()
     const raw = Object.fromEntries(formData)
     const parsed = z.object({ id: z.string().uuid() }).safeParse(raw)
     if (!parsed.success) return err(parsed.error.issues.map((e) => e.message).join(", "))
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profile?.role !== "admin") {
+      const { data: dent } = await supabase
+        .from("dentists")
+        .select("id")
+        .eq("profile_id", user.id)
+        .single()
+      if (!dent) return err("Acesso negado")
+
+      const { data: appt } = await supabase
+        .from("appointments")
+        .select("dentist_id")
+        .eq("id", parsed.data.id)
+        .single()
+      if (appt?.dentist_id !== dent.id) return err("Acesso negado")
+    }
 
     const { error } = await supabase.from("appointments").delete().eq("id", parsed.data.id)
     if (error) return err(error.message)
@@ -377,5 +444,55 @@ export async function deleteAppointment(formData: FormData) {
     return ok()
   } catch {
     return err("Erro ao excluir agendamento")
+  }
+}
+
+export async function getAgendaData(startDate: string, endDate: string) {
+  try {
+    const { supabase } = await requireAuth()
+
+    const dentistFilter = await getUserDentistFilter()
+
+    let apptQuery = supabase
+      .from("appointments")
+      .select("id, patient_id, dentist_id, procedure_id, start_time, end_time, status, notes, created_at, updated_at, return_to_id, patients(name), dentists(name), procedures(name, color, duration_minutes)")
+      .gte("start_time", startDate)
+      .lte("start_time", endDate)
+      .neq("status", "cancelled")
+
+    if (dentistFilter !== null) {
+      if (dentistFilter.length > 0) {
+        apptQuery = apptQuery.in("dentist_id", dentistFilter)
+      } else {
+        apptQuery = apptQuery.eq("dentist_id", NULL_UUID)
+      }
+    }
+
+    const [appointments, dentists, patients, procedures, dentistProcs, approvedReqs] = await Promise.all([
+      apptQuery.order("start_time").then((r) => r.data ?? []),
+      supabase.from("dentists").select("id, name").order("name").then((r) => r.data ?? []),
+      supabase.from("patients").select("id, name").order("name").then((r) => r.data ?? []),
+      supabase.from("procedures").select("id, name, color, duration_minutes").order("name").then((r) => r.data ?? []),
+      supabase.from("dentist_procedures").select("dentist_id, procedure_id").eq("active", true).then((r) => r.data ?? []),
+      supabase.from("procedure_requests").select("dentist_id, created_procedure_id").eq("status", "approved").then((r) => r.data ?? []),
+    ])
+
+    return ok({ appointments, dentists, patients, procedures, dentistProcs, approvedReqs })
+  } catch {
+    return err("Erro ao carregar agenda")
+  }
+}
+
+export async function getPatientDetailsById(id: string) {
+  try {
+    const { supabase } = await requireAuth()
+    const { data } = await supabase
+      .from("patients")
+      .select("id, name, cpf, phone, email, birth_date, notes")
+      .eq("id", id)
+      .single()
+    return ok(data)
+  } catch {
+    return err("Paciente não encontrado")
   }
 }

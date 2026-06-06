@@ -22,14 +22,14 @@ export async function getPatients() {
       const patientIds = [...new Set(patientsWithAccess?.map((a) => a.patient_id) ?? [])]
 
       if (patientIds.length > 0) {
-        const { data } = await supabase.from("patients").select("*").in("id", patientIds).order("name")
+        const { data } = await supabase.from("patients").select("id, name, cpf, phone, email, birth_date, notes, active").in("id", patientIds).order("name")
         return data ?? []
       }
 
       return []
     }
 
-    const { data } = await supabase.from("patients").select("*").order("name")
+    const { data } = await supabase.from("patients").select("id, name, cpf, phone, email, birth_date, notes, active").order("name")
     return data ?? []
   } catch {
     return []
@@ -119,12 +119,86 @@ export async function updatePatient(formData: FormData) {
   }
 }
 
-export async function deletePatient(formData: FormData) {
+export async function getPatientsPaginated(
+  page: number,
+  pageSize: number,
+  search?: string,
+  sortColumn?: string,
+  sortDir?: string,
+) {
   try {
     const { supabase } = await requireAuth()
+
+    const validSortColumns = ["name", "cpf", "email", "birth_date", "active"]
+    const col = validSortColumns.includes(sortColumn ?? "") ? sortColumn! : "name"
+    const dir = sortDir === "desc" ? "desc" : "asc"
+
+    const dentistFilter = await getUserDentistFilter()
+
+    let patientIds: string[] | null = null
+    if (dentistFilter !== null) {
+      const { data: appts } = await supabase
+        .from("appointments")
+        .select("patient_id")
+        .in("dentist_id", dentistFilter.length > 0 ? dentistFilter : [NULL_UUID])
+      patientIds = [...new Set((appts ?? []).map((a) => a.patient_id))]
+    }
+
+    let query = supabase
+      .from("patients")
+      .select("id, name, cpf, phone, email, birth_date, notes, active, created_at", { count: "exact" })
+
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,cpf.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
+    }
+
+    if (patientIds !== null) {
+      query = query.in("id", patientIds.length > 0 ? patientIds : [NULL_UUID])
+    }
+
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    const { data, count } = await query
+      .order(col, { ascending: dir === "asc" })
+      .range(from, to)
+
+    return ok({ data: data ?? [], total: count ?? 0 })
+  } catch {
+    return err("Erro ao buscar pacientes")
+  }
+}
+
+export async function getPatientDetails(id: string) {
+  try {
+    const { supabase } = await requireAuth()
+    const { data } = await supabase
+      .from("patients")
+      .select("id, name, cpf, phone, email, birth_date, notes")
+      .eq("id", id)
+      .single()
+    return ok(data)
+  } catch {
+    return err("Paciente não encontrado")
+  }
+}
+
+export async function deletePatient(formData: FormData) {
+  try {
+    const { supabase, user } = await requireAuth()
     const raw = Object.fromEntries(formData)
     const parsed = z.object({ id: z.string().uuid() }).safeParse(raw)
     if (!parsed.success) return err(parsed.error.issues.map((e) => e.message).join(", "))
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+
+    if (profile?.role !== "admin" && profile?.role !== "dentist") {
+      return err("Acesso negado")
+    }
 
     const { error } = await supabase.from("patients").delete().eq("id", parsed.data.id)
     if (error) return err(error.message)
