@@ -558,6 +558,84 @@ export async function getAgendaData(startDate: string, endDate: string) {
   }
 }
 
+export async function startAppointment(formData: FormData) {
+  try {
+    const { supabase, user } = await requireAuth()
+
+    const { data: dentist } = await supabase
+      .from("dentists")
+      .select("id")
+      .eq("profile_id", user.id)
+      .single()
+
+    if (!dentist) return err("Perfil de dentista não encontrado")
+
+    const raw = Object.fromEntries(formData)
+    const parsed = z.object({ id: z.string().uuid() }).safeParse(raw)
+    if (!parsed.success) return err("ID inválido")
+
+    const { data: appt } = await supabase
+      .from("appointments")
+      .select("id, status, dentist_id")
+      .eq("id", parsed.data.id)
+      .single()
+
+    if (!appt) return err("Agendamento não encontrado")
+    if (appt.dentist_id !== dentist.id) return err("Este agendamento não pertence a você")
+    if (appt.status !== "scheduled" && appt.status !== "confirmed") return err("Agendamento não pode ser iniciado")
+
+    const { error } = await supabase
+      .from("appointments")
+      .update({ started_at: new Date().toISOString(), status: "in_progress" } as any)
+      .eq("id", parsed.data.id)
+
+    if (error) return err(error.message)
+    revalidatePath("/atendimentos")
+    return ok()
+  } catch {
+    return err("Erro ao iniciar atendimento")
+  }
+}
+
+export async function finishAppointment(formData: FormData) {
+  try {
+    const { supabase, user } = await requireAuth()
+
+    const { data: dentist } = await supabase
+      .from("dentists")
+      .select("id")
+      .eq("profile_id", user.id)
+      .single()
+
+    if (!dentist) return err("Perfil de dentista não encontrado")
+
+    const raw = Object.fromEntries(formData)
+    const parsed = z.object({ id: z.string().uuid() }).safeParse(raw)
+    if (!parsed.success) return err("ID inválido")
+
+    const { data: appt } = await supabase
+      .from("appointments")
+      .select("id, status, dentist_id")
+      .eq("id", parsed.data.id)
+      .single()
+
+    if (!appt) return err("Agendamento não encontrado")
+    if (appt.dentist_id !== dentist.id) return err("Este agendamento não pertence a você")
+    if (appt.status !== "in_progress") return err("Agendamento não está em andamento")
+
+    const { error } = await supabase
+      .from("appointments")
+      .update({ finished_at: new Date().toISOString(), status: "completed" } as any)
+      .eq("id", parsed.data.id)
+
+    if (error) return err(error.message)
+    revalidatePath("/atendimentos")
+    return ok()
+  } catch {
+    return err("Erro ao finalizar atendimento")
+  }
+}
+
 export async function getPatientDetailsById(id: string) {
   try {
     const { supabase } = await requireAuth()

@@ -97,12 +97,14 @@ export type Database = {
           created_at: string
           dentist_id: string
           end_time: string
+          finished_at?: string | null
           id: string
           notes: string | null
           patient_id: string
           procedure_id: string | null
           return_to_id: string | null
           start_time: string
+          started_at?: string | null
           status: string
           updated_at: string
         }
@@ -110,12 +112,14 @@ export type Database = {
           created_at?: string
           dentist_id: string
           end_time: string
+          finished_at?: string | null
           id?: string
           notes?: string | null
           patient_id: string
           procedure_id?: string | null
           return_to_id?: string | null
           start_time: string
+          started_at?: string | null
           status?: string
           updated_at?: string
         }
@@ -123,12 +127,14 @@ export type Database = {
           created_at?: string
           dentist_id?: string
           end_time?: string
+          finished_at?: string | null
           id?: string
           notes?: string | null
           patient_id?: string
           procedure_id?: string | null
           return_to_id?: string | null
           start_time?: string
+          started_at?: string | null
           status?: string
           updated_at?: string
         }

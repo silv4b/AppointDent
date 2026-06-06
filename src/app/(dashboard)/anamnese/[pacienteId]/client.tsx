@@ -41,7 +41,8 @@ import { getUserSessionData } from "@/lib/actions/session"
 import { cn } from "@/lib/utils"
 import { Database } from "@/types/database"
 import { format } from "date-fns"
-import { ChevronDown, ChevronUp, Eye, FileDown, FileText, Loader2, Maximize2, Minimize2, MoreVertical, Pen, Pill, Plus, Stethoscope, Trash2 } from "lucide-react"
+import { finishAppointment } from "@/lib/actions/appointments"
+import { ChevronDown, ChevronUp, Clock, Eye, FileDown, FileText, Loader2, Maximize2, Minimize2, MoreVertical, Pen, Pill, Plus, Stethoscope, StopCircle, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -101,6 +102,7 @@ export function PacienteAnamneseClient({ pacienteId, appointmentId, sessionId }:
   const [loadingTemplates, setLoadingTemplates] = useState(false)
   const [focused, setFocused] = useState(false)
   const [linkedAppointment, setLinkedAppointment] = useState<Appointment | null>(null)
+  const [finishingAppointment, setFinishingAppointment] = useState(false)
 
   const statusColorMap: Record<string, string> = {
     pending: "bg-purple-100 text-purple-800",
@@ -365,6 +367,20 @@ const [anamPageSize, setAnamPageSize] = useState(10)
     if (patient) window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
+  const handleFinishAppointment = async () => {
+    if (!linkedAppointment) return
+    setFinishingAppointment(true)
+    const form = new FormData()
+    form.set("id", linkedAppointment.id)
+    const result = await finishAppointment(form)
+    if (result?.error) {
+      toast.error(result.error)
+    } else {
+      toast.success("Atendimento finalizado")
+    }
+    setFinishingAppointment(false)
+  }
+
   const cancelEdit = () => {
     resetForm()
   }
@@ -407,6 +423,28 @@ const [anamPageSize, setAnamPageSize] = useState(10)
       await new Promise((r) => setTimeout(r, 500))
     }
     toast.success("Todas as sessões exportadas")
+  }
+
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+
+  useEffect(() => {
+    if (!linkedAppointment || linkedAppointment.status !== "in_progress" || !linkedAppointment.started_at) return
+    const start = new Date(linkedAppointment.started_at).getTime()
+    const tick = () => setElapsedSeconds(Math.floor((Date.now() - start) / 1000))
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [linkedAppointment])
+
+  const durationMinutes = linkedAppointment?.procedures?.duration_minutes ?? 0
+  const totalSeconds = durationMinutes * 60
+  const remainingSeconds = Math.max(totalSeconds - elapsedSeconds, 0)
+  const progress = totalSeconds > 0 ? (elapsedSeconds / totalSeconds) * 100 : 0
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
   }
 
   if (loading) {
@@ -633,17 +671,62 @@ const [anamPageSize, setAnamPageSize] = useState(10)
                   </p>
                 )}
                 {linkedAppointment && (
-                  <p className="mt-2 inline-flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
-                    <FileText className="h-3.5 w-3.5" />
-                    Vinculado ao agendamento de{" "}
-                    <strong>{format(new Date(linkedAppointment.start_time), "dd/MM/yyyy HH:mm")}</strong>
-                    {linkedAppointment.dentists?.name && (
-                      <>com <strong>{linkedAppointment.dentists.name}</strong></>
+                  <div className="mt-2 space-y-2">
+                    <p className="inline-flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
+                      <FileText className="h-3.5 w-3.5" />
+                      Vinculado ao agendamento de{" "}
+                      <strong>{format(new Date(linkedAppointment.start_time), "dd/MM/yyyy HH:mm")}</strong>
+                      {linkedAppointment.dentists?.name && (
+                        <>com <strong>{linkedAppointment.dentists.name}</strong></>
+                      )}
+                      {linkedAppointment.procedures?.name && (
+                        <>({linkedAppointment.procedures.name})</>
+                      )}
+                    </p>
+
+                    {linkedAppointment.status === "in_progress" && (
+                      <>
+                        <div className="flex items-center gap-4 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20 px-4 py-3">
+                          <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
+                            <Clock className="h-4 w-4" />
+                            {durationMinutes > 0 ? (
+                              <>
+                                <span className="font-mono font-bold text-base">{formatTime(elapsedSeconds)}</span>
+                                <span className="text-amber-600 dark:text-amber-400">/</span>
+                                <span className="font-mono">{formatTime(totalSeconds)}</span>
+                              </>
+                            ) : (
+                              <span className="font-mono font-bold text-base">{formatTime(elapsedSeconds)}</span>
+                            )}
+                          </div>
+                          {durationMinutes > 0 && (
+                            <div className="flex-1 h-2 rounded-full bg-amber-200 dark:bg-amber-800 overflow-hidden max-w-48">
+                              <div
+                                className={`h-full rounded-full transition-all duration-1000 ${
+                                  progress > 100 ? "bg-red-500" : progress > 80 ? "bg-amber-500" : "bg-green-500"
+                                }`}
+                                style={{ width: `${Math.min(progress, 100)}%` }}
+                              />
+                            </div>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="ml-auto border-amber-400 bg-amber-100 text-amber-800 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-800/60 gap-1.5"
+                            onClick={handleFinishAppointment}
+                            disabled={finishingAppointment}
+                          >
+                            {finishingAppointment ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <StopCircle className="h-4 w-4" />
+                            )}
+                            Encerrar Atendimento
+                          </Button>
+                        </div>
+                      </>
                     )}
-                    {linkedAppointment.procedures?.name && (
-                      <>({linkedAppointment.procedures.name})</>
-                    )}
-                  </p>
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-2">

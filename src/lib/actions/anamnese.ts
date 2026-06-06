@@ -173,7 +173,7 @@ export async function getPatientAnamneseData(pacienteId: string) {
 
     let apptsQuery = supabase
       .from("appointments")
-      .select("id, patient_id, dentist_id, procedure_id, start_time, end_time, status, notes, created_at, updated_at, return_to_id, patients(name), dentists(name), procedures(name, color, duration_minutes)")
+      .select("id, patient_id, dentist_id, procedure_id, start_time, end_time, status, notes, started_at, finished_at, created_at, updated_at, return_to_id, patients(name), dentists(name), procedures(name, color, duration_minutes)")
       .eq("patient_id", pacienteId)
 
     let sessionsQuery = supabase
