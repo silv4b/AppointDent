@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/table"
 import { upsertDentistProcedure } from "@/lib/actions/dentist-procedures"
 import { createProcedureRequest, getMyProcedureRequests } from "@/lib/actions/procedure-requests"
-import { createClient } from "@/lib/supabase/client"
+import { getMeusProcedimentosData } from "@/lib/actions/queries"
 import { Database } from "@/types/database"
 import { useSupabase } from "@/components/providers/supabase-provider"
 import { ArrowUpDown, ArrowUp, ArrowDown, Loader2, Plus, Save, CheckCircle, XCircle, Clock } from "lucide-react"
@@ -57,7 +57,6 @@ export function MeusProcedimentosClient() {
   const [dentistId, setDentistId] = useState<string | null>(null)
 
   const [procedures, setProcedures] = useState<Procedure[]>([])
-  const [dentistProcedures, setDentistProcedures] = useState<DentistProcedure[]>([])
   const [requests, setRequests] = useState<ProcedureRequest[]>([])
   const [saving, setSaving] = useState<string | null>(null)
   const [localPrices, setLocalPrices] = useState<Record<string, string>>({})
@@ -80,49 +79,36 @@ export function MeusProcedimentosClient() {
   const [reqPageSize, setReqPageSize] = useState(10)
 
   useEffect(() => {
-    if (!user) { setLoading(false); return }
-    const supabase = createClient()
-    supabase.from("profiles").select("role").eq("id", user.id).single()
-      .then(async ({ data: profile }) => {
-        if (!profile || profile.role !== "dentist") { setLoading(false); return }
+    let cancelled = false
+    ;(async () => {
+      if (!user) return
+      const result = await getMeusProcedimentosData()
+      if (cancelled) return
+      if (!("data" in result) || !result.data) { setLoading(false); return }
 
-        const { data: dentist } = await supabase
-          .from("dentists")
-          .select("id")
-          .eq("profile_id", user.id)
-          .single()
+      const { dentistId, procedures, dentistProcedures } = result.data
+      setDentistId(dentistId)
+      setProcedures(procedures as Procedure[])
+      const dps = dentistProcedures as DentistProcedure[]
 
-        if (dentist) {
-          setDentistId(dentist.id)
+      const prices: Record<string, string> = {}
+      const durations: Record<string, string> = {}
+      const active: Record<string, boolean> = {}
+      for (const p of procedures) {
+        const dp = dps.find((d) => d.procedure_id === p.id)
+        prices[p.id] = dp?.price != null ? String(dp.price) : (p.price != null ? String(p.price) : "")
+        durations[p.id] = dp?.duration_minutes != null ? String(dp.duration_minutes) : String(p.duration_minutes)
+        active[p.id] = dp?.active ?? false
+      }
+      setLocalPrices(prices)
+      setLocalDurations(durations)
+      setLocalActive(active)
 
-          const [procRes, dpRes] = await Promise.all([
-            supabase.from("procedures").select("*").eq("active", true).order("name"),
-            supabase.from("dentist_procedures").select("*").eq("dentist_id", dentist.id),
-          ])
-
-          setProcedures(procRes.data ?? [])
-          const dps = dpRes.data as DentistProcedure[] ?? []
-          setDentistProcedures(dps)
-
-          const prices: Record<string, string> = {}
-          const durations: Record<string, string> = {}
-          const active: Record<string, boolean> = {}
-          for (const p of procRes.data ?? []) {
-            const dp = dps.find((d) => d.procedure_id === p.id)
-            prices[p.id] = dp?.price != null ? String(dp.price) : (p.price != null ? String(p.price) : "")
-            durations[p.id] = dp?.duration_minutes != null ? String(dp.duration_minutes) : String(p.duration_minutes)
-            active[p.id] = dp?.active ?? false
-          }
-          setLocalPrices(prices)
-          setLocalDurations(durations)
-          setLocalActive(active)
-
-          const res = await getMyProcedureRequests(dentist.id)
-          if ("data" in res) setRequests(res.data as ProcedureRequest[])
-        }
-
-        setLoading(false)
-      })
+      const res = await getMyProcedureRequests(dentistId)
+      if ("data" in res) setRequests(res.data as ProcedureRequest[])
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
   }, [user])
 
   const handleToggle = useCallback(async (procedureId: string, checked: boolean) => {

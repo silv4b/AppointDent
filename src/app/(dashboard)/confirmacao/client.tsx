@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { format } from "date-fns"
 import { isSameDay, startOfDay } from "date-fns"
 import { CalendarDays, Check, Copy, Eye, MessageCircle, PanelLeftClose, PanelLeftOpen, Search, X, Loader2 } from "lucide-react"
@@ -31,8 +31,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { getPendingAppointments, confirmAppointment, rejectAppointment } from "@/lib/actions/appointments"
+import { getPendingAppointments, confirmAppointment, rejectAppointment, getPatientDetailsById } from "@/lib/actions/appointments"
 import { createClient } from "@/lib/supabase/client"
+import { getUserSessionData } from "@/lib/actions/session"
+import { getDentistsSimpleList } from "@/lib/actions/queries"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -61,64 +63,59 @@ export function ConfirmacaoClient() {
   const [patientDetailsOpen, setPatientDetailsOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage("confirmacao:sidebarCollapsed", false)
   const [userRole, setUserRole] = useState<string | null>(null)
-  const [currentDentistId, setCurrentDentistId] = useState<string | null>(null)
+  const [, setCurrentDentistId] = useState<string | null>(null)
   const [receptionistDentistIds, setReceptionistDentistIds] = useState<string[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkLoading, setBulkLoading] = useState(false)
   const bulkLoadingRef = useRef(false)
 
-  const supabase = createClient()
-
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data: profile }) => {
-        if (!profile) return
-        setUserRole(profile.role)
-        if (profile.role === "dentist") {
-          supabase.from("dentists").select("id").eq("profile_id", user.id).single().then(({ data: dent }) => {
-            if (dent) {
-              setCurrentDentistId(dent.id)
-              setFilterDentist(dent.id)
-            }
-          })
-        } else if (profile.role === "receptionist") {
-          supabase.from("receptionist_dentists").select("dentist_id").eq("receptionist_id", user.id).then(({ data }) => {
-            const ids = data?.map((r) => r.dentist_id) ?? []
-            setReceptionistDentistIds(ids)
-          })
-        }
-      })
+    getUserSessionData().then((result) => {
+      if (!("data" in result)) return
+      const { role, dentistId, receptionistDentistIds } = result.data
+      setUserRole(role)
+      if (role === "dentist" && dentistId) {
+        setCurrentDentistId(dentistId)
+        setFilterDentist(dentistId)
+      } else if (role === "receptionist") {
+        setReceptionistDentistIds(receptionistDentistIds)
+      }
     })
-  }, [supabase])
-
-  const fetchPending = useCallback(async () => {
-    const [pendingRes, dentistsData] = await Promise.all([
-      getPendingAppointments(),
-      supabase.from("dentists").select("id, name").eq("active", true).order("name").then((r) => r.data ?? []),
-    ])
-    if ("error" in pendingRes) {
-      toast.error(pendingRes.error!)
-    } else {
-      setAppointments(pendingRes.data ?? [])
-    }
-    setDentists(dentistsData)
-    setLoading(false)
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
-    fetchPending()
-  }, [fetchPending])
+    let cancelled = false
+    ;(async () => {
+      const [pendingRes, dentistsResult] = await Promise.all([
+        getPendingAppointments(),
+        getDentistsSimpleList(),
+      ])
+      if (cancelled) return
+      if ("error" in pendingRes) {
+        toast.error(pendingRes.error!)
+      } else {
+        setAppointments(pendingRes.data ?? [])
+      }
+      setDentists(("data" in dentistsResult) ? dentistsResult.data : [])
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
+    const supabase = createClient()
     const channel = supabase
       .channel("confirmacao-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "appointments" }, () => {
-        fetchPending()
+        ;(async () => {
+          const res = await getPendingAppointments()
+          if ("data" in res) setAppointments(res.data ?? [])
+        })()
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [supabase, fetchPending])
+  }, [])
 
   const filtered = useMemo(() => {
     let list = appointments
@@ -149,6 +146,7 @@ export function ConfirmacaoClient() {
   }, [filtered, page, pageSize])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1)
   }, [search, filterDate, filterDentist])
 
@@ -162,7 +160,7 @@ export function ConfirmacaoClient() {
     setConfirming(false)
     if (result?.error) {
       toast.error(result.error)
-      fetchPending()
+      ;(async () => { const res = await getPendingAppointments(); if ("data" in res) setAppointments(res.data ?? []) })()
     } else {
       toast.success("Agendamento confirmado com sucesso!")
     }
@@ -178,20 +176,16 @@ export function ConfirmacaoClient() {
     setRejecting(false)
     if (result?.error) {
       toast.error(result.error)
-      fetchPending()
+      ;(async () => { const res = await getPendingAppointments(); if ("data" in res) setAppointments(res.data ?? []) })()
     } else {
       toast.success("Agendamento cancelado.")
     }
   }
 
   const handleViewPatient = async (appointment: Appointment) => {
-    const { data } = await supabase
-      .from("patients")
-      .select("*")
-      .eq("id", appointment.patient_id)
-      .single()
-    if (data) {
-      setPatientDetails(data)
+    const result = await getPatientDetailsById(appointment.patient_id)
+    if ("data" in result && result.data) {
+      setPatientDetails(result.data as Database["public"]["Tables"]["patients"]["Row"])
       setPatientDetailsOpen(true)
     }
   }
@@ -216,6 +210,7 @@ export function ConfirmacaoClient() {
   const handleBulkConfirm = async () => {
     if (bulkLoadingRef.current || selectedCount === 0) return
     bulkLoadingRef.current = true
+    setBulkLoading(true)
     const ids = [...selectedIds]
     setSelectedIds([])
     setAppointments(prev => prev.filter(a => !ids.includes(a.id)))
@@ -223,16 +218,18 @@ export function ConfirmacaoClient() {
     const errors = results.filter(r => r?.error)
     if (errors.length > 0) {
       toast.error(`${errors.length} de ${ids.length} agendamento(s) não confirmados.`)
-      fetchPending()
+      ;(async () => { const res = await getPendingAppointments(); if ("data" in res) setAppointments(res.data ?? []) })()
     } else {
       toast.success(`${ids.length} agendamento(s) confirmado(s)!`)
     }
     bulkLoadingRef.current = false
+    setBulkLoading(false)
   }
 
   const handleBulkReject = async () => {
     if (bulkLoadingRef.current || selectedCount === 0) return
     bulkLoadingRef.current = true
+    setBulkLoading(true)
     const ids = [...selectedIds]
     setSelectedIds([])
     setAppointments(prev => prev.filter(a => !ids.includes(a.id)))
@@ -240,11 +237,12 @@ export function ConfirmacaoClient() {
     const errors = results.filter(r => r?.error)
     if (errors.length > 0) {
       toast.error(`${errors.length} de ${ids.length} agendamento(s) não recusados.`)
-      fetchPending()
+      ;(async () => { const res = await getPendingAppointments(); if ("data" in res) setAppointments(res.data ?? []) })()
     } else {
       toast.success(`${ids.length} agendamento(s) recusado(s)!`)
     }
     bulkLoadingRef.current = false
+    setBulkLoading(false)
   }
 
   return (
@@ -305,9 +303,9 @@ export function ConfirmacaoClient() {
                     size="sm"
                     className="text-green-600 border-green-200 hover:bg-green-50"
                     onClick={handleBulkConfirm}
-                    disabled={bulkLoadingRef.current}
+                    disabled={bulkLoading}
                   >
-                    {bulkLoadingRef.current ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    {bulkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                     Confirmar
                   </Button>
                   <Button
@@ -315,9 +313,9 @@ export function ConfirmacaoClient() {
                     size="sm"
                     className="text-red-600 border-red-200 hover:bg-red-50"
                     onClick={handleBulkReject}
-                    disabled={bulkLoadingRef.current}
+                    disabled={bulkLoading}
                   >
-                    {bulkLoadingRef.current ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                    {bulkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
                     Recusar
                   </Button>
                 </div>

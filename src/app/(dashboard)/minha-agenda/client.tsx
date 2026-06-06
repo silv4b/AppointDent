@@ -18,12 +18,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { DataTablePagination } from "@/components/data-table-pagination"
-import { createClient } from "@/lib/supabase/client"
+import { getMinhaAgendaAppointments } from "@/lib/actions/queries"
+import { getUserSessionData } from "@/lib/actions/session"
 import { Database } from "@/types/database"
 import { format } from "date-fns"
 import { Calendar, Clock, Loader2, Search, X } from "lucide-react"
 import Link from "next/link"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 type Appointment = Database["public"]["Tables"]["appointments"]["Row"] & {
   patients: { name: string } | null
@@ -61,8 +62,6 @@ export function MinhaAgendaClient() {
   const [dateTo, setDateTo] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const fetch = useCallback(
     async (t?: Tab, p?: number, ps?: number) => {
       const activeTab = t ?? tab
@@ -70,111 +69,87 @@ export function MinhaAgendaClient() {
       const pageSizeNum = ps ?? pageSize
 
       setLoading(true)
-      const supabase = createClient()
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setLoading(false); return }
+      const result = await getMinhaAgendaAppointments({
+        tab: activeTab,
+        page: pageNum,
+        pageSize: pageSizeNum,
+        patientSearch: patientSearch || undefined,
+        procedureSearch: procedureSearch || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        statusFilter: statusFilter !== "all" ? statusFilter : undefined,
+      })
 
-      let dentist = dentistId
-      if (!dentist) {
-        const { data: d } = await supabase
-          .from("dentists")
-          .select("id, name")
-          .eq("profile_id", user.id)
-          .single()
-        if (!d) { setLoading(false); return }
-        dentist = d.id
-        setDentistId(d.id)
-      }
-
-      // Resolve patient IDs for name search
-      let patientIds: string[] | null = null
-      const psTrim = patientSearch.trim()
-      if (psTrim.length > 0) {
-        const { data: matched } = await supabase
-          .from("patients")
-          .select("id")
-          .ilike("name", `%${psTrim}%`)
-        patientIds = matched?.map((m) => m.id) ?? []
-        if (patientIds.length === 0) {
-          setAppointments([])
-          setTotal(0)
-          setLoading(false)
-          return
-        }
-      }
-
-      // Resolve procedure IDs for name search
-      let procedureIds: string[] | null = null
-      const prTrim = procedureSearch.trim()
-      if (prTrim.length > 0) {
-        const { data: matched } = await supabase
-          .from("procedures")
-          .select("id")
-          .ilike("name", `%${prTrim}%`)
-        procedureIds = matched?.map((m) => m.id) ?? []
-        if (procedureIds.length === 0) {
-          setAppointments([])
-          setTotal(0)
-          setLoading(false)
-          return
-        }
-      }
-
-      const now = new Date()
-      let query = supabase
-        .from("appointments")
-        .select("*, patients(name), procedures(name, color, duration_minutes)", { count: "exact" })
-        .eq("dentist_id", dentist)
-
-      if (patientIds) query = query.in("patient_id", patientIds)
-      if (procedureIds) query = query.in("procedure_id", procedureIds)
-      if (statusFilter !== "all") query = query.eq("status", statusFilter)
-      if (dateFrom) query = query.gte("start_time", new Date(dateFrom + "T00:00:00").toISOString())
-      if (dateTo) query = query.lte("end_time", new Date(dateTo + "T23:59:59").toISOString())
-
-      if (activeTab === "future") {
-        query = query
-          .gte("start_time", now.toISOString())
-          .order("start_time", { ascending: true })
-      } else if (activeTab === "past") {
-        query = query
-          .lt("end_time", now.toISOString())
-          .order("start_time", { ascending: false })
+      if ("data" in result) {
+        setAppointments(result.data.data as Appointment[])
+        setTotal(result.data.total)
       } else {
-        query = query
-          .lte("start_time", now.toISOString())
-          .gte("end_time", now.toISOString())
-          .order("start_time", { ascending: true })
+        setAppointments([])
+        setTotal(0)
       }
-
-      if (activeTab !== "current") {
-        const { data, count } = await query
-          .range(
-            (pageNum - 1) * pageSizeNum,
-            pageNum * pageSizeNum - 1,
-          )
-        setAppointments(data ?? [])
-        if (count !== null) setTotal(count)
-      } else {
-        const { data } = await query
-        setAppointments(data ?? [])
-        setTotal(data?.length ?? 0)
-      }
-
       setLoading(false)
     },
-    [tab, page, pageSize, dentistId, patientSearch, procedureSearch, dateFrom, dateTo, statusFilter],
+    [tab, page, pageSize, patientSearch, procedureSearch, dateFrom, dateTo, statusFilter],
   )
 
   useEffect(() => {
-    setPage(1)
-    fetch(tab, 1, pageSize)
-  }, [tab, patientSearch, procedureSearch, dateFrom, dateTo, statusFilter])
+    getUserSessionData().then((result) => {
+      if ("data" in result && result.data.dentistId) {
+        setDentistId(result.data.dentistId)
+      }
+    })
+  }, [])
 
   useEffect(() => {
-    if (tab !== "current") fetch(tab, page, pageSize)
-  }, [page, pageSize])
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPage(1)
+    if (dentistId) {
+      ;(async () => {
+        const result = await getMinhaAgendaAppointments({
+          tab,
+          page: 1,
+          pageSize,
+          patientSearch: patientSearch || undefined,
+          procedureSearch: procedureSearch || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          statusFilter: statusFilter !== "all" ? statusFilter : undefined,
+        })
+        if ("data" in result) {
+          setAppointments(result.data.data as Appointment[])
+          setTotal(result.data.total)
+        } else {
+          setAppointments([])
+          setTotal(0)
+        }
+      })()
+    }
+  }, [tab, patientSearch, procedureSearch, dateFrom, dateTo, statusFilter, dentistId, pageSize])
+
+  useEffect(() => {
+    if (tab !== "current") {
+      ;(async () => {
+        const result = await getMinhaAgendaAppointments({
+          tab,
+          page,
+          pageSize,
+          patientSearch: patientSearch || undefined,
+          procedureSearch: procedureSearch || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+          statusFilter: statusFilter !== "all" ? statusFilter : undefined,
+        })
+        if ("data" in result) {
+          setAppointments(result.data.data as Appointment[])
+          setTotal(result.data.total)
+        } else {
+          setAppointments([])
+          setTotal(0)
+        }
+      })()
+    }
+  }, [page, pageSize, tab, patientSearch, procedureSearch, dateFrom, dateTo, statusFilter])
 
   const handleTabChange = (newTab: Tab) => {
     if (newTab !== tab) {

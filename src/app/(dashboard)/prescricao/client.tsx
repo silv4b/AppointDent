@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { format } from "date-fns"
-import { Eye, Pencil, Plus, Search, Trash2, X, FileText } from "lucide-react"
+import { Eye, Pencil, Plus, Search, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -18,7 +18,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { getPrescriptions, deletePrescription } from "@/lib/actions/prescriptions"
-import { createClient } from "@/lib/supabase/client"
+import { getUserSessionData } from "@/lib/actions/session"
 
 type PrescriptionRow = {
   id: string
@@ -40,36 +40,30 @@ export function PrescricaoClient() {
   const [deleting, setDeleting] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
 
-  const supabase = createClient()
+  useEffect(() => {
+    getUserSessionData().then((result) => {
+      if ("data" in result) setUserRole(result.data.role)
+    })
+  }, [])
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data }) => {
-        if (data) setUserRole(data.role)
-      })
-    })
-  }, [supabase])
-
-  const fetch = useCallback(async (p?: number, ps?: number, s?: string) => {
-    const pageNum = p ?? page
-    const pageSizeNum = ps ?? pageSize
-    const searchTerm = s ?? search
-    const result = await getPrescriptions(pageNum, pageSizeNum, searchTerm || undefined)
-    if ("error" in result) {
-      toast.error(result.error)
-    } else if ("data" in result && result.data) {
-      setPrescriptions(result.data.data as unknown as PrescriptionRow[])
-      setTotal(result.data.total)
-    }
-    setLoading(false)
+    let cancelled = false
+    ;(async () => {
+      const result = await getPrescriptions(page, pageSize, search || undefined)
+      if (cancelled) return
+      if ("error" in result) {
+        toast.error(result.error)
+      } else if ("data" in result && result.data) {
+        setPrescriptions(result.data.data as unknown as PrescriptionRow[])
+        setTotal(result.data.total)
+      }
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
   }, [page, pageSize, search])
 
   useEffect(() => {
-    fetch()
-  }, [fetch])
-
-  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1)
   }, [search])
 
@@ -82,7 +76,13 @@ export function PrescricaoClient() {
     const result = await deletePrescription(target.id)
     if (result?.error) {
       toast.error(result.error)
-      fetch(page)
+      ;(async () => {
+        const r = await getPrescriptions(page, pageSize, search || undefined)
+        if ("data" in r && r.data) {
+          setPrescriptions(r.data.data as unknown as PrescriptionRow[])
+          setTotal(r.data.total)
+        }
+      })()
     } else {
       toast.success("Receita excluída")
     }

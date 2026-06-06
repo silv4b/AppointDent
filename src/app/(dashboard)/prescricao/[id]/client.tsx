@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/dialog"
 
 import { toast } from "sonner"
-import { createClient } from "@/lib/supabase/client"
 import {
   getPrescription,
   savePrescription,
@@ -26,6 +25,8 @@ import {
   getDentistList,
 } from "@/lib/actions/prescriptions"
 import { getClinicSettings } from "@/lib/actions/clinic-settings"
+import { getUserSessionData } from "@/lib/actions/session"
+import { getAnamneseSessionByAppointment, getPatientName, searchPatientsByName } from "@/lib/actions/queries"
 import { generatePrescriptionPdf } from "@/lib/utils/export-prescription-pdf"
 import type { Database } from "@/types/database"
 
@@ -78,23 +79,16 @@ export function PrescricaoFormClient({
   const [linkedAnamnese, setLinkedAnamnese] = useState<{ title: string; fields: { label: string; description?: string; defaultContent?: string; content?: string }[]; notes: string | null; created_at: string; dentists: { name: string } | null } | null>(null)
   const [anamneseModalOpen, setAnamneseModalOpen] = useState(false)
 
-  const supabase = createClient()
-
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      supabase.from("profiles").select("role").eq("id", user.id).single().then(({ data }) => {
-        if (data) {
-          setUserRole(data.role)
-          if (data.role === "dentist") {
-            supabase.from("dentists").select("id").eq("profile_id", user.id).single().then(({ data: dent }) => {
-              if (dent) setDentistId(dent.id)
-            })
-          }
+    getUserSessionData().then((result) => {
+      if ("data" in result) {
+        setUserRole(result.data.role)
+        if (result.data.role === "dentist" && result.data.dentistId) {
+          setDentistId(result.data.dentistId)
         }
-      })
+      }
     })
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     getDentistList().then((result) => {
@@ -128,57 +122,44 @@ export function PrescricaoFormClient({
         }))
         setMedications(meds)
         if (data.appointment_id) {
-          supabase
-            .from("anamnese_sessions")
-            .select("title, fields, notes, created_at, dentists(name)")
-            .eq("appointment_id", data.appointment_id)
-            .single()
-            .then(({ data: anamnese }) => {
-              if (anamnese) setLinkedAnamnese(anamnese as any)
-            })
+          getAnamneseSessionByAppointment(data.appointment_id).then((r) => {
+            if ("data" in r && r.data) setLinkedAnamnese(r.data as unknown as { title: string; fields: { label: string; description?: string; defaultContent?: string; content?: string }[]; notes: string | null; created_at: string; dentists: { name: string } | null })
+          })
         }
         setLoading(false)
       })
     } else {
       const prefillPatientId = searchParams.get("pacienteId")
       if (prefillPatientId) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setPatientId(prefillPatientId)
         setPatientLocked(true)
-        supabase.from("patients").select("id, name").eq("id", prefillPatientId).single().then(({ data }) => {
-          if (data) setPatientName(data.name)
+        getPatientName(prefillPatientId).then((r) => {
+          if ("data" in r && r.data) setPatientName(r.data.name)
         })
       }
       const appointmentIdParam = searchParams.get("appointmentId")
       setLoading(false)
       if (appointmentIdParam) {
-        supabase
-          .from("anamnese_sessions")
-          .select("title, fields, notes, created_at, dentists(name)")
-          .eq("appointment_id", appointmentIdParam)
-          .single()
-          .then(({ data: anamnese }) => {
-            if (anamnese) setLinkedAnamnese(anamnese as any)
-          })
+        getAnamneseSessionByAppointment(appointmentIdParam).then((r) => {
+          if ("data" in r && r.data) setLinkedAnamnese(r.data as unknown as { title: string; fields: { label: string; description?: string; defaultContent?: string; content?: string }[]; notes: string | null; created_at: string; dentists: { name: string } | null })
+        })
       }
     }
-  }, [prescriptionId, isNew, router, searchParams, supabase])
+  }, [prescriptionId, isNew, router, searchParams])
 
   useEffect(() => {
     if (!patientSearch.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPatientResults([])
       return
     }
     const timeout = setTimeout(async () => {
-      const { data } = await supabase
-        .from("patients")
-        .select("id, name, phone")
-        .ilike("name", `%${patientSearch}%`)
-        .order("name")
-        .limit(10)
-      setPatientResults(data ?? [])
+      const r = await searchPatientsByName(patientSearch)
+      if ("data" in r) setPatientResults(r.data)
     }, 300)
     return () => clearTimeout(timeout)
-  }, [patientSearch, supabase])
+  }, [patientSearch])
 
   const selectPatient = (id: string, name: string) => {
     setPatientId(id)
