@@ -54,3 +54,4 @@ next-env.d.ts
 # sql
 
 .sql_scripts/
+supabase/snippets/
