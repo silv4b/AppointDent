@@ -145,7 +145,7 @@ Edite o arquivo `.env.local` na raiz do projeto e substitua as URLs locais pelas
 ```env
 # Antes (local)
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54331
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<SUA_ANON_KEY>
 
 # Depois (cloud)
 NEXT_PUBLIC_SUPABASE_URL=https://<seu-projeto>.supabase.co
