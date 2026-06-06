@@ -160,7 +160,7 @@ function SlotDialog({
   )
 }
 
-function ClinicHoursSection() {
+function ClinicHoursSection({ readOnly }: { readOnly?: boolean }) {
   const [hours, setHours] = useState<ClinicHour[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -222,7 +222,7 @@ function ClinicHoursSection() {
         <div>
           <h2 className="text-base font-semibold">Funcionamento da Clínica</h2>
           <p className="text-xs text-muted-foreground">
-            Defina os horários de abertura e fechamento da clínica por dia da semana
+            {readOnly ? "Visualização dos horários da clínica" : "Defina os horários de abertura e fechamento da clínica por dia da semana"}
           </p>
         </div>
       </div>
@@ -238,6 +238,7 @@ function ClinicHoursSection() {
               onOpenTimeChange={(v) => handleSaveDay(day, v, parseTime(day.close_time))}
               onCloseTimeChange={(v) => handleSaveDay(day, parseTime(day.open_time), v)}
               onToggleOpen={() => handleToggleOpen(day)}
+              readOnly={readOnly}
             />
           )
         })}
@@ -253,6 +254,7 @@ function ClinicHourRow({
   onOpenTimeChange,
   onCloseTimeChange,
   onToggleOpen,
+  readOnly,
 }: {
   day: ClinicHour
   openTime: string
@@ -260,6 +262,7 @@ function ClinicHourRow({
   onOpenTimeChange: (v: string) => void
   onCloseTimeChange: (v: string) => void
   onToggleOpen: () => void
+  readOnly?: boolean
 }) {
 
   return (
@@ -268,12 +271,13 @@ function ClinicHourRow({
         <span className={`min-w-[8rem] text-sm font-medium ${!day.is_open ? "text-muted-foreground line-through" : ""}`}>
           {DAY_NAMES_FULL[day.day_of_week]}
         </span>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
+        <label className={`flex items-center gap-2 text-sm ${readOnly ? "" : "cursor-pointer"}`}>
           <input
             type="checkbox"
             checked={day.is_open}
-            onChange={onToggleOpen}
-            className="h-4 w-4 rounded border-muted-foreground text-primary focus:ring-primary"
+            onChange={readOnly ? undefined : onToggleOpen}
+            disabled={readOnly}
+            className="h-4 w-4 rounded border-muted-foreground text-primary focus:ring-primary disabled:opacity-60"
           />
           <span className="text-muted-foreground">{day.is_open ? "Aberto" : "Fechado"}</span>
         </label>
@@ -286,6 +290,7 @@ function ClinicHourRow({
               type="time"
               value={openTime}
               onChange={(e) => onOpenTimeChange(e.target.value)}
+              disabled={readOnly}
               className="h-8 w-28"
             />
             <span className="text-sm text-muted-foreground">às</span>
@@ -293,6 +298,7 @@ function ClinicHourRow({
               type="time"
               value={closeTime}
               onChange={(e) => onCloseTimeChange(e.target.value)}
+              disabled={readOnly}
               className="h-8 w-28"
             />
           </div>
@@ -302,7 +308,7 @@ function ClinicHourRow({
   )
 }
 
-export function HorariosClient() {
+export function HorariosClient({ role }: { role: string | null }) {
   const [slots, setSlots] = useState<Slot[]>([])
   const [dentists, setDentists] = useState<Dentist[]>([])
   const [edit, setEdit] = useState<Slot | null>(null)
@@ -358,7 +364,7 @@ export function HorariosClient() {
     .filter((g) => g.slots.length > 0)
 
   const toggleExpanded = (id: string) => {
-    setExpanded((prev) => ({ ...prev, [id]: !(prev[id] ?? true) }))
+    setExpanded((prev) => ({ ...prev, [id]: !(prev[id] ?? false) }))
   }
 
   const dentistsWithoutSlots = dentists.filter(
@@ -377,7 +383,7 @@ export function HorariosClient() {
       </div>
 
       <div className="mb-8">
-        <ClinicHoursSection />
+        <ClinicHoursSection readOnly={role !== "admin"} />
       </div>
 
       {loading ? (
@@ -387,7 +393,7 @@ export function HorariosClient() {
       ) : (
         <div className="space-y-6">
           {grouped.map(({ dentist, slots: dentistSlots }) => {
-            const isExpanded = expanded[dentist.id] ?? true
+            const isExpanded = expanded[dentist.id] ?? false
             return (
               <div key={dentist.id} className="rounded-2xl border bg-card transition-shadow">
                 <div
