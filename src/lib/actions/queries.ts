@@ -72,6 +72,19 @@ export async function getDentistsSimpleList() {
   }
 }
 
+export async function getReceptionistDentistIds(receptionistProfileId: string) {
+  try {
+    const { supabase } = await requireAuth()
+    const { data } = await supabase
+      .from("receptionist_dentists")
+      .select("dentist_id")
+      .eq("receptionist_id", receptionistProfileId)
+    return ok(data?.map((r) => r.dentist_id) ?? [])
+  } catch {
+    return err("Erro ao carregar vínculos da recepcionista")
+  }
+}
+
 export async function getProceduresPaginated(
   page: number,
   pageSize: number,

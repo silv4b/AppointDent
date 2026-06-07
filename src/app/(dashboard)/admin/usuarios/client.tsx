@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dialog"
 import { DataTablePagination } from "@/components/data-table-pagination"
 import { createUser, deleteUser, getUsers, updateUser } from "@/lib/actions/admin"
-import { createClient } from "@/lib/supabase/client"
+import { getDentistsSimpleList, getReceptionistDentistIds } from "@/lib/actions/queries"
 import { ArrowDown, ArrowUp, ArrowUpDown, Eye, EyeOff, Pencil, Plus, Search, Trash2, X } from "lucide-react"
 import { useCallback, useEffect, useRef, useState, startTransition } from "react"
 import { toast } from "sonner"
@@ -79,11 +79,9 @@ function CriarUsuarioDialog({
 
   useEffect(() => {
     if (open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDentistIds([])
-      const supabase = createClient()
-      supabase.from("dentists").select("id, name").eq("active", true).order("name").then(({ data }) => {
-        if (data) setDentists(data)
+      getDentistsSimpleList().then((res) => {
+        if ("data" in res && res.data) setDentists(res.data.map((d) => ({ id: d.id, name: d.name })))
       })
     }
   }, [open])
@@ -226,13 +224,12 @@ function EditarUsuarioDialog({
 
   useEffect(() => {
     if (open && user) {
-      const supabase = createClient()
-      supabase.from("dentists").select("id, name").eq("active", true).order("name").then(({ data }) => {
-        if (data) setDentists(data)
+      getDentistsSimpleList().then((res) => {
+        if ("data" in res && res.data) setDentists(res.data.map((d) => ({ id: d.id, name: d.name })))
       })
       if (user.role === "receptionist") {
-        supabase.from("receptionist_dentists").select("dentist_id").eq("receptionist_id", user.id).then(({ data }) => {
-          if (data) setDentistIds(data.map((r) => r.dentist_id))
+        getReceptionistDentistIds(user.id).then((res) => {
+          if ("data" in res && res.data) setDentistIds(res.data)
         })
       }
     }
