@@ -1,12 +1,11 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
-
+<!-- markdownlint-disable MD041 MD060 -->
 ## Response Protocol
 
 Be concise in your answers, only provide the necessary information. Only give more details if requested.
+
+## Terminal command execution
+
+Never execute terminal commands without the user's express authorization. Any action involving the shell (docker, supabase CLI, git, npm, etc.) must first be described and approved before execution. Exception: purely informational commands with no side effects, such as `npx tsc --noEmit` for type checking.
 
 ## Commit protocol
 
@@ -15,15 +14,15 @@ Given the identified project modifications (git status):
 1. Analyze all changes.
 2. List all changes by scope (front, back, infrastructure, architecture, etc.).
 3. Inform the user of the file batches along with commit messages for each batch, following semantic commit conventions.
-    - Each batch must contain: **lote number**, **commit message** (Portuguese, semantic format), and **list of files**.
+    - Each batch must contain: **batch number**, **commit message** (Portuguese, semantic format), and **list of files**.
     - Format example:
 
       ```text
-      **Lote 1 — `feat: criar tabela de pacientes`**
+      **Batch 1 — `feat: criar tabela de pacientes`**
       src/lib/actions/pacientes.ts
       src/app/(dashboard)/pacientes/client.tsx
 
-      **Lote 2 — `fix: corrigir filtro por data`**
+      **Batch 2 — `fix: corrigir filtro por data`**
       src/app/(dashboard)/agenda/client.tsx
       ```
 
@@ -60,24 +59,24 @@ All tables in the system (current and future) **must** have pagination on their 
 
 ## RLS & Database Security
 
-Toda nova tabela criada no Supabase **deve** seguir estas regras de segurança obrigatoriamente:
+Every new table created in Supabase **must** follow these security rules:
 
-### 1. RLS obrigatório
+### 1. RLS is mandatory
 
-- Toda tabela **deve** ter `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` na migration de criação.
-- Nenhuma tabela pode ficar sem RLS — dados ficam expostos via API REST do Supabase.
+- Every table **must** have `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` in the creation migration.
+- No table may be left without RLS — data becomes exposed via the Supabase REST API.
 
-### 2. Policies por role
+### 2. Policies by role
 
-Toda operação (SELECT/INSERT/UPDATE/DELETE) deve ser escopada pelo perfil do usuário usando `public.get_user_role()`:
+Every operation (SELECT/INSERT/UPDATE/DELETE) must be scoped by the user's profile using `public.get_user_role()`:
 
 | Role | SELECT | INSERT | UPDATE | DELETE |
 |------|--------|--------|--------|--------|
-| **admin** | tudo | tudo | tudo | tudo |
-| **dentist** | só o que lhe pertence (`dentist_id` = próprio perfil) | só criando para si | só o que lhe pertence | só o que lhe pertence |
-| **receptionist** | só o que pertence a dentistas vinculados (`receptionist_dentists`) | **nunca** (salvo exceção explícita) | **nunca** (salvo exceção explícita) | **nunca** |
+| **admin** | everything | everything | everything | everything |
+| **dentist** | only what belongs to them (`dentist_id` = own profile) | only creating for themselves | only what belongs to them | only what belongs to them |
+| **receptionist** | only what belongs to linked dentists (`receptionist_dentists`) | **never** (unless explicitly excepted) | **never** (unless explicitly excepted) | **never** (unless explicitly excepted) |
 
-Template padrão de policy:
+Default policy template:
 
 ```sql
 CREATE POLICY "select <table> by scope" ON <table>
@@ -89,29 +88,29 @@ CREATE POLICY "select <table> by scope" ON <table>
   );
 ```
 
-O mesmo padrão se aplica a INSERT (WITH CHECK), UPDATE (USING + WITH CHECK) e DELETE (USING).
+The same pattern applies to INSERT (WITH CHECK), UPDATE (USING + WITH CHECK) and DELETE (USING).
 
-### 3. Nunca usar `USING (true)` em SELECT
+### 3. Never use `USING (true)` in SELECT
 
-Select público (`USING (true)`) jamais pode ser usado em tabelas com dados sensíveis. Se um SELECT irrestrito for necessário (ex: tabela de lookup tipo `procedures`), use `auth.role() = 'authenticated'` como mínimo — ao menos exige login.
+Public SELECT (`USING (true)`) must never be used on tables with sensitive data. If an unrestricted SELECT is necessary (e.g. lookup tables like `procedures`), use `auth.role() = 'authenticated'` as a minimum — at least requires login.
 
-### 4. Atenção ao nome das policies ao dropar
+### 4. Pay attention to policy names when dropping
 
-Quando uma migration anterior renomeou policies, o nome antigo usado num `DROP POLICY` pode não funcionar. Sempre verifique o nome atual da policy em `pg_policies` antes de dropar. Use `DROP POLICY IF EXISTS "<nome_exato>" ON <tabela>`.
+When a previous migration renamed policies, the old name used in a `DROP POLICY` statement may not work. Always verify the current policy name in `pg_policies` before dropping. Use `DROP POLICY IF EXISTS "<exact_name>" ON <table>`.
 
-### 5. Policies conflitantes (OR)
+### 5. Conflicting policies (OR)
 
-RLS faz **OR** entre policies do mesmo comando numa tabela. Se você criar uma policy restritiva sem dropar a permissiva anterior, a permissiva ainda vale. Sempre drope a antiga ao substituir.
+RLS applies **OR** between policies of the same command on a table. If you create a restrictive policy without dropping the previous permissive one, the permissive one still applies. Always drop the old one when replacing.
 
-### 6. Server actions como camada extra
+### 6. Server actions as an extra layer
 
-Toda query a dados do Supabase deve passar por server actions (`"use server"` em `src/lib/actions/`), não por `createClient()` direto no cliente. Exceção única: canais real-time (WebSocket), que precisam do client-side.
+Every query to Supabase data must go through server actions (`"use server"` in `src/lib/actions/`), not through `createClient()` directly on the client. Sole exception: real-time channels (WebSocket), which need the client-side.
 
-### 7. Revisão ao adicionar feature
+### 7. Review when adding a feature
 
-Ao criar uma nova tabela ou adicionar uma operação numa tabela existente:
+When creating a new table or adding an operation to an existing table:
 
-1. Adicione RLS + policies na mesma migration
-2. Siga o template de escopo por role
-3. Verifique se não há policies antigas conflitando (use `pg_policies`)
-4. Teste a migration localmente com `npx supabase migration up`
+1. Add RLS + policies in the same migration
+2. Follow the role-based scope template
+3. Check if there are no old policies conflicting (use `pg_policies`)
+4. Test the migration locally with `npx supabase migration up`
