@@ -6,6 +6,7 @@ import { createUserSchema } from "@/lib/schemas"
 import { ok, err } from "@/lib/utils/action-response"
 import { translateMessage } from "@/lib/utils/translate-error"
 import { z } from "zod"
+import { sendWelcomeEmail } from "@/lib/email"
 
 export async function getUsers(page = 1, pageSize = 10) {
   try {
@@ -170,6 +171,19 @@ export async function createUser(formData: FormData) {
           dentist_id,
         }))
         await supabase.from("receptionist_dentists").insert(inserts)
+      }
+    }
+
+    if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+      try {
+        await sendWelcomeEmail({
+          to: parsed.data.email,
+          name: parsed.data.name,
+          role: parsed.data.role,
+          password: parsed.data.password,
+        })
+      } catch (e) {
+        console.error("Failed to send welcome email:", e)
       }
     }
 
