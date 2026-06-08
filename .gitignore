@@ -60,3 +60,6 @@ supabase/snippets/
 
 # solders
 .scripts/
+
+# temporary files
+tmp/

@@ -72,14 +72,17 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
   const { user } = useSupabase()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [role, setRole] = useState<string | null>(null)
+  const [navReady, setNavReady] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
   useEffect(() => {
-    getUserSessionData().then((result) => {
-      if ("data" in result) setRole(result.data.role)
-      else setRole(null)
-    })
-  }, [user])
+    getUserSessionData()
+      .then((result) => {
+        if ("data" in result) setRole(result.data.role)
+        setNavReady(true)
+      })
+      .catch(() => setNavReady(true))
+  }, [])
 
   const userName = user?.user_metadata?.name as string | undefined
   const userEmail = user?.email ?? null
@@ -183,7 +186,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
       </Link>
 
       <nav className="flex-1 overflow-y-auto px-2 py-4">
-        {role === null ? (
+        {!navReady ? (
           <div className="space-y-2 px-3">
             <div className={cn("h-3 w-20 animate-pulse rounded bg-sidebar-foreground/10", collapsed && "hidden")} />
             <div className={cn("h-8 w-full animate-pulse rounded bg-sidebar-foreground/10", collapsed && "hidden")} />
