@@ -47,3 +47,34 @@ export async function sendWelcomeEmail({
     `,
   })
 }
+
+export async function sendPasswordChangedEmail({
+  to,
+  name,
+  gmailUser,
+  gmailAppPassword,
+}: {
+  to: string
+  name: string
+  gmailUser: string
+  gmailAppPassword: string
+}) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user: gmailUser, pass: gmailAppPassword },
+  })
+
+  await transporter.sendMail({
+    from: `"AppointDent" <${gmailUser}>`,
+    to,
+    subject: "Sua senha foi alterada",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+        <h2 style="color: #2563eb; margin-bottom: 16px;">Senha alterada com sucesso!</h2>
+        <p style="color: #374151;">Olá <strong>${name}</strong>,</p>
+        <p style="color: #374151;">Sua senha no <strong>AppointDent</strong> foi alterada com sucesso.</p>
+        <p style="color: #374151;">Se foi você, ignore este email. Caso não tenha sido, entre em contato com o administrador imediatamente.</p>
+      </div>
+    `,
+  })
+}

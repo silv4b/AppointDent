@@ -35,7 +35,8 @@ export async function getUserDentistFilter(): Promise<string[] | null> {
 
     return null
   } catch {
-    return null
+    // On error, return [] (no access) instead of null (full access)
+    return []
   }
 }
 

@@ -7,6 +7,7 @@ const TAG_LENGTH = 16
 function getKey(): Buffer {
   const hex = process.env.APP_CONFIG_ENCRYPTION_KEY
   if (!hex) throw new Error("APP_CONFIG_ENCRYPTION_KEY is not set")
+  if (hex.length !== 64) throw new Error("APP_CONFIG_ENCRYPTION_KEY must be 64 hex characters (32 bytes)")
   return Buffer.from(hex, "hex")
 }
 

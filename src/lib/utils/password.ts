@@ -1,3 +1,9 @@
+function randomInt(max: number): number {
+  const array = new Uint32Array(1)
+  crypto.getRandomValues(array)
+  return array[0] % max
+}
+
 export function generatePassword(length = 12): string {
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
   const lower = "abcdefghijklmnopqrstuvwxyz"
@@ -7,19 +13,19 @@ export function generatePassword(length = 12): string {
   const all = upper + lower + digits + special
 
   const required = [
-    upper[Math.floor(Math.random() * upper.length)],
-    lower[Math.floor(Math.random() * lower.length)],
-    digits[Math.floor(Math.random() * digits.length)],
-    special[Math.floor(Math.random() * special.length)],
+    upper[randomInt(upper.length)],
+    lower[randomInt(lower.length)],
+    digits[randomInt(digits.length)],
+    special[randomInt(special.length)],
   ]
 
   const remaining = Array.from({ length: length - 4 }, () =>
-    all[Math.floor(Math.random() * all.length)]
+    all[randomInt(all.length)]
   )
 
   const chars = [...required, ...remaining]
   for (let i = chars.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = randomInt(i + 1)
     ;[chars[i], chars[j]] = [chars[j], chars[i]]
   }
 
