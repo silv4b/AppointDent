@@ -2,7 +2,7 @@
 
 import { useSupabase } from "@/components/providers/supabase-provider"
 import { getUserSessionData } from "@/lib/actions/session"
-import { updateProfileName, updateProfileEmail, updateProfilePassword } from "@/lib/actions/profile"
+import { updateProfileName, updateProfileEmail, updateProfilePassword, updateAutoConfirm } from "@/lib/actions/profile"
 import { useCallback, useEffect, useState } from "react"
 import { Building2, Loader2, User, BadgeInfo, Upload, Eye, EyeOff, Check, X, Mail, Dices, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -105,11 +105,15 @@ export function PerfilClient() {
   const [gmailAppPassword, setGmailAppPassword] = useState("")
   const [savingEmailConfig, setSavingEmailConfig] = useState(false)
 
+  const [autoConfirm, setAutoConfirm] = useState(true)
+  const [savingAutoConfirm, setSavingAutoConfirm] = useState(false)
+
   useEffect(() => {
     getUserSessionData().then((result) => {
       if ("data" in result) {
         setRole(result.data.role)
         setMustChangePassword(result.data.mustChangePassword)
+        setAutoConfirm(result.data.autoConfirm)
       }
       setLoading(false)
     })
@@ -248,6 +252,9 @@ export function PerfilClient() {
     )
   }
 
+  const passwordError = newPassword ? validatePassword(newPassword) : null
+  const passwordsMatch = newPassword === confirmPassword
+
   if (mustChangePassword) {
     return (
       <div className="mx-auto max-w-lg">
@@ -309,9 +316,6 @@ export function PerfilClient() {
 
   const displayName = user?.user_metadata?.name as string | undefined
   const userEmail = user?.email ?? "—"
-  const passwordError = newPassword ? validatePassword(newPassword) : null
-  const passwordsMatch = newPassword === confirmPassword
-
   return (
     <div>
       <div className="mb-8">
@@ -361,6 +365,39 @@ export function PerfilClient() {
               <p className="text-sm font-medium">{ROLE_LABEL[role ?? ""] ?? role ?? "—"}</p>
             </div>
           </div>
+
+          {(role === "dentist" || role === "admin") && (
+            <div className="flex items-center justify-between py-4">
+              <div>
+                <p className="text-sm font-medium">Confirmar agendamentos automaticamente</p>
+                <p className="text-xs text-muted-foreground">
+                  Quando ativado, agendamentos criados por você já nascem como Confirmados, pulando a etapa de Pendente.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoConfirm}
+                disabled={savingAutoConfirm}
+                onClick={async () => {
+                  setSavingAutoConfirm(true)
+                  const newValue = !autoConfirm
+                  setAutoConfirm(newValue)
+                  const result = await updateAutoConfirm(newValue)
+                  if (result?.error) {
+                    setAutoConfirm(!newValue)
+                    toast.error(result.error)
+                  } else {
+                    toast.success(newValue ? "Confirmação automática ativada" : "Confirmação automática desativada")
+                  }
+                  setSavingAutoConfirm(false)
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${autoConfirm ? "bg-primary" : "bg-input"}`}
+              >
+                <span className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${autoConfirm ? "translate-x-5" : "translate-x-0"}`} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
